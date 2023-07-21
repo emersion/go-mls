@@ -1,0 +1,12 @@
+image: alpine/latest
+packages:
+  - go
+sources:
+  - https://git.sr.ht/~emersion/go-mls
+tasks:
+  - build: |
+      cd go-mls
+      go build -race -v ./...
+  - test: |
+      cd go-mls
+      go test -race ./...
