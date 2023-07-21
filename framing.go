@@ -86,7 +86,7 @@ type framedContent struct {
 
 func unmarshalFramedContent(s *cryptobyte.String) (*framedContent, error) {
 	var framedContent framedContent
-	if !readOpaque(s, (*[]byte)(&framedContent.groupID)) || !s.ReadUint64(&framedContent.epoch) {
+	if !readOpaqueVec(s, (*[]byte)(&framedContent.groupID)) || !s.ReadUint64(&framedContent.epoch) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
@@ -96,13 +96,13 @@ func unmarshalFramedContent(s *cryptobyte.String) (*framedContent, error) {
 	}
 	framedContent.sender = *sender
 
-	if !readOpaque(s, &framedContent.authenticatedData) || !s.ReadUint8((*uint8)(&framedContent.contentType)) {
+	if !readOpaqueVec(s, &framedContent.authenticatedData) || !s.ReadUint8((*uint8)(&framedContent.contentType)) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
 	switch framedContent.contentType {
 	case contentTypeApplication:
-		if !readOpaque(s, &framedContent.applicationData) {
+		if !readOpaqueVec(s, &framedContent.applicationData) {
 			return nil, io.ErrUnexpectedEOF
 		}
 	case contentTypeProposal:
@@ -171,12 +171,12 @@ type framedContentAuthData struct {
 
 func unmarshalFramedContentAuthData(s *cryptobyte.String, ct contentType) (*framedContentAuthData, error) {
 	var authData framedContentAuthData
-	if !readOpaque(s, &authData.signature) {
+	if !readOpaqueVec(s, &authData.signature) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
 	if ct == contentTypeCommit {
-		if !readOpaque(s, &authData.confirmationTag) {
+		if !readOpaqueVec(s, &authData.confirmationTag) {
 			return nil, io.ErrUnexpectedEOF
 		}
 	}
@@ -206,7 +206,7 @@ func unmarshalPublicMessage(s *cryptobyte.String) (*publicMessage, error) {
 		auth:    *auth,
 	}
 	if content.sender.senderType == senderTypeMember {
-		if !readOpaque(s, &msg.membershipTag) {
+		if !readOpaqueVec(s, &msg.membershipTag) {
 			return nil, io.ErrUnexpectedEOF
 		}
 	}
@@ -225,10 +225,10 @@ type privateMessage struct {
 
 func unmarshalPrivateMessage(s *cryptobyte.String) (*privateMessage, error) {
 	var msg privateMessage
-	if !readOpaque(s, (*[]byte)(&msg.groupID)) || !s.ReadUint64(&msg.epoch) || !s.ReadUint8((*uint8)(&msg.contentType)) {
+	if !readOpaqueVec(s, (*[]byte)(&msg.groupID)) || !s.ReadUint64(&msg.epoch) || !s.ReadUint8((*uint8)(&msg.contentType)) {
 		return nil, io.ErrUnexpectedEOF
 	}
-	if !readOpaque(s, &msg.authenticatedData) || !readOpaque(s, &msg.encryptedSenderData) || !readOpaque(s, &msg.ciphertext) {
+	if !readOpaqueVec(s, &msg.authenticatedData) || !readOpaqueVec(s, &msg.encryptedSenderData) || !readOpaqueVec(s, &msg.ciphertext) {
 		return nil, io.ErrUnexpectedEOF
 	}
 	return &msg, nil

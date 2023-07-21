@@ -110,8 +110,8 @@ func (cs cipherSuite) signatureScheme() signatureScheme {
 
 func (cs cipherSuite) refHash(label, value []byte) ([]byte, error) {
 	b := cryptobyte.NewBuilder(nil)
-	writeOpaque(b, label)
-	writeOpaque(b, value)
+	writeOpaqueVec(b, label)
+	writeOpaqueVec(b, value)
 	in, err := b.Bytes()
 	if err != nil {
 		return nil, err
@@ -127,8 +127,8 @@ func (cs cipherSuite) expandWithLabel(secret, label, context []byte, length uint
 
 	b := cryptobyte.NewBuilder(nil)
 	b.AddUint16(length)
-	writeOpaque(b, label)
-	writeOpaque(b, context)
+	writeOpaqueVec(b, label)
+	writeOpaqueVec(b, context)
 	kdfLabel, err := b.Bytes()
 	if err != nil {
 		return nil, err
@@ -224,8 +224,8 @@ func marshalSignContent(label, content []byte) ([]byte, error) {
 	label = append([]byte("MLS 1.0 "), label...)
 
 	b := cryptobyte.NewBuilder(nil)
-	writeOpaque(b, label)
-	writeOpaque(b, content)
+	writeOpaqueVec(b, label)
+	writeOpaqueVec(b, content)
 	return b.Bytes()
 }
 
@@ -233,8 +233,8 @@ func marshalEncryptContext(label, context []byte) ([]byte, error) {
 	label = append([]byte("MLS 1.0 "), label...)
 
 	b := cryptobyte.NewBuilder(nil)
-	writeOpaque(b, label)
-	writeOpaque(b, context)
+	writeOpaqueVec(b, label)
+	writeOpaqueVec(b, context)
 	return b.Bytes()
 }
 

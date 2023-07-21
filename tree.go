@@ -121,7 +121,7 @@ func unmarshalExtensionVec(s *cryptobyte.String) ([]extension, error) {
 	var exts []extension
 	err := readVector(s, func(s *cryptobyte.String) error {
 		var ext extension
-		if !s.ReadUint16((*uint16)(&ext.extensionType)) || !readOpaque(s, &ext.extensionData) {
+		if !s.ReadUint16((*uint16)(&ext.extensionType)) || !readOpaqueVec(s, &ext.extensionData) {
 			return io.ErrUnexpectedEOF
 		}
 		exts = append(exts, ext)
@@ -147,7 +147,7 @@ type leafNode struct {
 func unmarshalLeafNode(s *cryptobyte.String) (*leafNode, error) {
 	var node leafNode
 
-	if !readOpaque(s, (*[]byte)(&node.encryptionKey)) || !readOpaque(s, (*[]byte)(&node.signatureKey)) {
+	if !readOpaqueVec(s, (*[]byte)(&node.encryptionKey)) || !readOpaqueVec(s, (*[]byte)(&node.signatureKey)) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
@@ -173,7 +173,7 @@ func unmarshalLeafNode(s *cryptobyte.String) (*leafNode, error) {
 	case leafNodeSourceUpdate:
 		// nothing to do
 	case leafNodeSourceCommit:
-		if !readOpaque(s, &node.parentHash) {
+		if !readOpaqueVec(s, &node.parentHash) {
 			err = io.ErrUnexpectedEOF
 		}
 	default:
@@ -189,7 +189,7 @@ func unmarshalLeafNode(s *cryptobyte.String) (*leafNode, error) {
 	}
 	node.extensions = exts
 
-	if !readOpaque(s, &node.signature) {
+	if !readOpaqueVec(s, &node.signature) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
@@ -203,7 +203,7 @@ type hpkeCiphertext struct {
 
 func unmarshalHPKECiphertext(s *cryptobyte.String) (*hpkeCiphertext, error) {
 	var hpke hpkeCiphertext
-	if !readOpaque(s, &hpke.kemOutput) || !readOpaque(s, &hpke.ciphertext) {
+	if !readOpaqueVec(s, &hpke.kemOutput) || !readOpaqueVec(s, &hpke.ciphertext) {
 		return nil, io.ErrUnexpectedEOF
 	}
 	return &hpke, nil

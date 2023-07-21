@@ -102,7 +102,7 @@ func unmarshalGroupInfo(s *cryptobyte.String) (*groupInfo, error) {
 	}
 	info.extensions = exts
 
-	if !readOpaque(s, &info.confirmationTag) || !s.ReadUint32(&info.signer) || !readOpaque(s, &info.signature) {
+	if !readOpaqueVec(s, &info.confirmationTag) || !s.ReadUint32(&info.signer) || !readOpaqueVec(s, &info.signature) {
 		return nil, err
 	}
 
@@ -123,10 +123,10 @@ func unmarshalGroupContext(s *cryptobyte.String) (*groupContext, error) {
 	var ctx groupContext
 	ok := s.ReadUint16((*uint16)(&ctx.version)) &&
 		s.ReadUint16((*uint16)(&ctx.cipherSuite)) &&
-		readOpaque(s, (*[]byte)(&ctx.groupID)) &&
+		readOpaqueVec(s, (*[]byte)(&ctx.groupID)) &&
 		s.ReadUint64(&ctx.epoch) &&
-		readOpaque(s, &ctx.treeHash) &&
-		readOpaque(s, &ctx.confirmedTranscriptHash)
+		readOpaqueVec(s, &ctx.treeHash) &&
+		readOpaqueVec(s, &ctx.confirmedTranscriptHash)
 	if !ok {
 		return nil, io.ErrUnexpectedEOF
 	}
@@ -164,7 +164,7 @@ func unmarshalWelcome(s *cryptobyte.String) (*welcome, error) {
 		return nil, err
 	}
 
-	if !readOpaque(s, &welcome.encryptedGroupInfo) {
+	if !readOpaqueVec(s, &welcome.encryptedGroupInfo) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
@@ -178,7 +178,7 @@ type encryptedGroupSecrets struct {
 
 func unmarshalEncryptedGroupSecrets(s *cryptobyte.String) (*encryptedGroupSecrets, error) {
 	var sec encryptedGroupSecrets
-	if !readOpaque(s, (*[]byte)(&sec.newMember)) {
+	if !readOpaqueVec(s, (*[]byte)(&sec.newMember)) {
 		return nil, io.ErrUnexpectedEOF
 	}
 	hpke, err := unmarshalHPKECiphertext(s)

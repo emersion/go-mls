@@ -58,6 +58,8 @@ func testMessages(t *testing.T, tc *messagesTest) {
 			// TODO: test decoding → encoding
 		})
 	}
+
+	// TODO: other messages
 }
 
 func TestMessages(t *testing.T) {

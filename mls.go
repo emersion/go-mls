@@ -51,7 +51,7 @@ func writeVarint(b *cryptobyte.Builder, n uint32) {
 	}
 }
 
-func readOpaque(s *cryptobyte.String, out *[]byte) bool {
+func readOpaqueVec(s *cryptobyte.String, out *[]byte) bool {
 	var n uint32
 	if !readVarint(s, &n) {
 		return false
@@ -66,7 +66,7 @@ func readOpaque(s *cryptobyte.String, out *[]byte) bool {
 	return true
 }
 
-func writeOpaque(b *cryptobyte.Builder, value []byte) {
+func writeOpaqueVec(b *cryptobyte.Builder, value []byte) {
 	if len(value) >= 1<<32 {
 		b.SetError(fmt.Errorf("mls: opaque size exceeds maximum value of uint32"))
 		return

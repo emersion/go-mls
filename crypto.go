@@ -34,13 +34,13 @@ func unmarshalCredential(s *cryptobyte.String) (*credential, error) {
 
 	switch cred.credentialType {
 	case credentialTypeBasic:
-		if !readOpaque(s, &cred.identity) {
+		if !readOpaqueVec(s, &cred.identity) {
 			return nil, io.ErrUnexpectedEOF
 		}
 	case credentialTypeX509:
 		err := readVector(s, func(s *cryptobyte.String) error {
 			var cert []byte
-			if !readOpaque(s, &cert) {
+			if !readOpaqueVec(s, &cert) {
 				return io.ErrUnexpectedEOF
 			}
 			cred.certificates = append(cred.certificates, cert)

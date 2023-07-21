@@ -19,7 +19,7 @@ func unmarshalKeyPackage(s *cryptobyte.String) (*keyPackage, error) {
 	var pkg keyPackage
 	ok := s.ReadUint16((*uint16)(&pkg.version)) &&
 		s.ReadUint16((*uint16)(&pkg.cipherSuite)) &&
-		readOpaque(s, (*[]byte)(&pkg.initKey))
+		readOpaqueVec(s, (*[]byte)(&pkg.initKey))
 	if !ok {
 		return nil, io.ErrUnexpectedEOF
 	}
@@ -36,7 +36,7 @@ func unmarshalKeyPackage(s *cryptobyte.String) (*keyPackage, error) {
 	}
 	pkg.extensions = exts
 
-	if !readOpaque(s, &pkg.signature) {
+	if !readOpaqueVec(s, &pkg.signature) {
 		return nil, err
 	}
 
