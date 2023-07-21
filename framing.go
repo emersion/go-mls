@@ -144,7 +144,9 @@ func unmarshalMLSMessage(s *cryptobyte.String) (*mlsMessage, error) {
 		msg.privateMessage, err = unmarshalPrivateMessage(s)
 	case wireFormatMLSWelcome:
 		msg.welcome, err = unmarshalWelcome(s)
-	case wireFormatMLSGroupInfo, wireFormatMLSKeyPackage:
+	case wireFormatMLSGroupInfo:
+		msg.groupInfo, err = unmarshalGroupInfo(s)
+	case wireFormatMLSKeyPackage:
 		err = fmt.Errorf("TODO: unmarshalMLSMessage")
 	default:
 		err = fmt.Errorf("mls: invalid wire format %d", msg.wireFormat)

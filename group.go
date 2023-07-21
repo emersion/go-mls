@@ -50,7 +50,7 @@ type reInit struct {
 	groupID     GroupID
 	version     protocolVersion
 	cipherSuite cipherSuite
-	// TODO: extensions
+	extensions  []extension
 }
 
 type externalInit struct {
@@ -80,7 +80,64 @@ type commit struct {
 }
 
 type groupInfo struct {
-	// TODO
+	groupContext    groupContext
+	extensions      []extension
+	confirmationTag []byte
+	signer          uint32
+	signature       []byte
+}
+
+func unmarshalGroupInfo(s *cryptobyte.String) (*groupInfo, error) {
+	var info groupInfo
+
+	ctx, err := unmarshalGroupContext(s)
+	if err != nil {
+		return nil, err
+	}
+	info.groupContext = *ctx
+
+	exts, err := unmarshalExtensionVec(s)
+	if err != nil {
+		return nil, err
+	}
+	info.extensions = exts
+
+	if !readOpaque(s, &info.confirmationTag) || !s.ReadUint32(&info.signer) || !readOpaque(s, &info.signature) {
+		return nil, err
+	}
+
+	return &info, nil
+}
+
+type groupContext struct {
+	version                 protocolVersion
+	cipherSuite             cipherSuite
+	groupID                 GroupID
+	epoch                   uint64
+	treeHash                []byte
+	confirmedTranscriptHash []byte
+	extensions              []extension
+}
+
+func unmarshalGroupContext(s *cryptobyte.String) (*groupContext, error) {
+	var ctx groupContext
+	ok := s.ReadUint16((*uint16)(&ctx.version)) &&
+		s.ReadUint16((*uint16)(&ctx.cipherSuite)) &&
+		readOpaque(s, (*[]byte)(&ctx.groupID)) &&
+		s.ReadUint64(&ctx.epoch) &&
+		readOpaque(s, &ctx.treeHash) &&
+		readOpaque(s, &ctx.confirmedTranscriptHash)
+	if !ok {
+		return nil, io.ErrUnexpectedEOF
+	}
+
+	exts, err := unmarshalExtensionVec(s)
+	if err != nil {
+		return nil, err
+	}
+	ctx.extensions = exts
+
+	return &ctx, nil
 }
 
 type welcome struct {
