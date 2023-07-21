@@ -1,5 +1,11 @@
 package mls
 
+import (
+	"io"
+
+	"golang.org/x/crypto/cryptobyte"
+)
+
 // http://www.iana.org/assignments/mls/mls.xhtml#mls-proposal-types
 type proposalType uint16
 
@@ -79,11 +85,49 @@ type groupInfo struct {
 
 type welcome struct {
 	cipherSuite        cipherSuite
-	secrets            encryptedGroupSecrets
+	secrets            []encryptedGroupSecrets
 	encryptedGroupInfo []byte
 }
 
+func unmarshalWelcome(s *cryptobyte.String) (*welcome, error) {
+	var welcome welcome
+	if !s.ReadUint16((*uint16)(&welcome.cipherSuite)) {
+		return nil, io.ErrUnexpectedEOF
+	}
+
+	ss, ok := vectorString(s)
+	if !ok {
+		return nil, io.ErrUnexpectedEOF
+	}
+	for !ss.Empty() {
+		sec, err := unmarshalEncryptedGroupSecrets(&ss)
+		if err != nil {
+			return nil, err
+		}
+		welcome.secrets = append(welcome.secrets, *sec)
+	}
+
+	if !readOpaque(s, &welcome.encryptedGroupInfo) {
+		return nil, io.ErrUnexpectedEOF
+	}
+
+	return &welcome, nil
+}
+
 type encryptedGroupSecrets struct {
-	newMember keyPackageRef
-	// TODO: encryptedGroupSecrets
+	newMember             keyPackageRef
+	encryptedGroupSecrets hpkeCiphertext
+}
+
+func unmarshalEncryptedGroupSecrets(s *cryptobyte.String) (*encryptedGroupSecrets, error) {
+	var sec encryptedGroupSecrets
+	if !readOpaque(s, (*[]byte)(&sec.newMember)) {
+		return nil, io.ErrUnexpectedEOF
+	}
+	hpke, err := unmarshalHPKECiphertext(s)
+	if err != nil {
+		return nil, err
+	}
+	sec.encryptedGroupSecrets = *hpke
+	return &sec, nil
 }

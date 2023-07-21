@@ -73,3 +73,16 @@ func writeOpaque(b *cryptobyte.Builder, value []byte) {
 	writeVarint(b, uint32(len(value)))
 	b.AddBytes(value)
 }
+
+func vectorString(s *cryptobyte.String) (ss cryptobyte.String, ok bool) {
+	var n uint32
+	if !readVarint(s, &n) {
+		return nil, false
+	}
+	var vec []byte
+	if !s.ReadBytes(&vec, int(n)) {
+		return nil, false
+	}
+	ss = cryptobyte.String(vec)
+	return ss, true
+}

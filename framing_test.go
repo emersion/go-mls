@@ -36,7 +36,7 @@ func testMessages(t *testing.T, tc *messagesTest) {
 		name string
 		b    []byte
 	}{
-		//{"mls_welcome", []byte(tc.MLSWelcome)},
+		{"mls_welcome", []byte(tc.MLSWelcome)},
 		//{"mls_group_info", []byte(tc.MLSGroupInfo)},
 		//{"mls_key_package", []byte(tc.MLSKeyPackage)},
 		{"public_message_application", []byte(tc.PublicMessageApplication)},
