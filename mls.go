@@ -5,6 +5,7 @@ package mls
 
 import (
 	"fmt"
+	"io"
 
 	"golang.org/x/crypto/cryptobyte"
 )
@@ -74,15 +75,20 @@ func writeOpaque(b *cryptobyte.Builder, value []byte) {
 	b.AddBytes(value)
 }
 
-func vectorString(s *cryptobyte.String) (ss cryptobyte.String, ok bool) {
+func readVector(s *cryptobyte.String, f func(s *cryptobyte.String) error) error {
 	var n uint32
 	if !readVarint(s, &n) {
-		return nil, false
+		return io.ErrUnexpectedEOF
 	}
 	var vec []byte
 	if !s.ReadBytes(&vec, int(n)) {
-		return nil, false
+		return io.ErrUnexpectedEOF
 	}
-	ss = cryptobyte.String(vec)
-	return ss, true
+	ss := cryptobyte.String(vec)
+	for !ss.Empty() {
+		if err := f(&ss); err != nil {
+			return err
+		}
+	}
+	return nil
 }

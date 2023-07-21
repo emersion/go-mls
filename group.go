@@ -152,16 +152,16 @@ func unmarshalWelcome(s *cryptobyte.String) (*welcome, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
-	ss, ok := vectorString(s)
-	if !ok {
-		return nil, io.ErrUnexpectedEOF
-	}
-	for !ss.Empty() {
-		sec, err := unmarshalEncryptedGroupSecrets(&ss)
+	err := readVector(s, func(s *cryptobyte.String) error {
+		sec, err := unmarshalEncryptedGroupSecrets(s)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		welcome.secrets = append(welcome.secrets, *sec)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	if !readOpaque(s, &welcome.encryptedGroupInfo) {
