@@ -1,6 +1,7 @@
 package mls
 
 import (
+	"fmt"
 	"io"
 
 	"golang.org/x/crypto/cryptobyte"
@@ -67,6 +68,18 @@ const (
 	proposalOrRefTypeProposal  proposalOrRefType = 1
 	proposalOrRefTypeReference proposalOrRefType = 2
 )
+
+func (t *proposalOrRefType) unmarshal(s *cryptobyte.String) error {
+	if !s.ReadUint8((*uint8)(t)) {
+		return io.ErrUnexpectedEOF
+	}
+	switch *t {
+	case proposalOrRefTypeProposal, proposalOrRefTypeReference:
+		return nil
+	default:
+		return fmt.Errorf("mls: invalid proposal or ref type %d", *t)
+	}
+}
 
 type proposalOrRef struct {
 	typ      proposalOrRefType

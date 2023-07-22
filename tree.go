@@ -15,6 +15,18 @@ const (
 	leafNodeSourceCommit     leafNodeSource = 3
 )
 
+func (src *leafNodeSource) unmarshal(s *cryptobyte.String) error {
+	if !s.ReadUint8((*uint8)(src)) {
+		return io.ErrUnexpectedEOF
+	}
+	switch *src {
+	case leafNodeSourceKeyPackage, leafNodeSourceUpdate, leafNodeSourceCommit:
+		return nil
+	default:
+		return fmt.Errorf("mls: invalid leaf node source %d", *src)
+	}
+}
+
 type capabilities struct {
 	versions     []protocolVersion
 	cipherSuites []cipherSuite
@@ -25,6 +37,8 @@ type capabilities struct {
 
 func (caps *capabilities) unmarshal(s *cryptobyte.String) error {
 	*caps = capabilities{}
+
+	// Note: all unknown values here must be ignored
 
 	err := readVector(s, func(s *cryptobyte.String) error {
 		var ver protocolVersion
@@ -157,9 +171,8 @@ func (node *leafNode) unmarshal(s *cryptobyte.String) error {
 	if err := node.capabilities.unmarshal(s); err != nil {
 		return err
 	}
-
-	if !s.ReadUint8((*uint8)(&node.leafNodeSource)) {
-		return io.ErrUnexpectedEOF
+	if err := node.leafNodeSource.unmarshal(s); err != nil {
+		return err
 	}
 
 	var err error
@@ -167,14 +180,10 @@ func (node *leafNode) unmarshal(s *cryptobyte.String) error {
 	case leafNodeSourceKeyPackage:
 		node.lifetime = new(lifetime)
 		err = node.lifetime.unmarshal(s)
-	case leafNodeSourceUpdate:
-		// nothing to do
 	case leafNodeSourceCommit:
 		if !readOpaqueVec(s, &node.parentHash) {
 			err = io.ErrUnexpectedEOF
 		}
-	default:
-		err = fmt.Errorf("mls: invalid leaf node source %d", node.leafNodeSource)
 	}
 	if err != nil {
 		return err
