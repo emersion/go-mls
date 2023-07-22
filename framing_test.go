@@ -21,11 +21,25 @@ func testMessages(t *testing.T, tc map[string]testBytes) {
 		{"mls_welcome", new(mlsMessage)},
 		{"mls_group_info", new(mlsMessage)},
 		{"mls_key_package", new(mlsMessage)},
+
+		// TODO
+		//{"ratchet_tree", nil},
+		//{"group_secrets", new(groupSecrets)},
+
+		{"add_proposal", new(add)},
+		//{"update_proposal", new(update)},
+		//{"remove_proposal", new(remove)},
+		//{"pre_shared_key_proposal", new(preSharedKey)},
+		//{"re_init_proposal", new(reInit)},
+		//{"external_init_proposal", new(externalInit)},
+		//{"group_context_extensions_proposal", new(groupContextExtensions)},
+
+		{"commit", new(commit)},
+
 		{"public_message_application", new(mlsMessage)},
 		{"public_message_proposal", new(mlsMessage)},
 		{"public_message_commit", new(mlsMessage)},
 		{"private_message", new(mlsMessage)},
-		// TODO: other messages
 	}
 	for _, msg := range msgs {
 		t.Run(msg.name, func(t *testing.T) {
