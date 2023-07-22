@@ -34,13 +34,13 @@ func (t *proposalType) unmarshal(s *cryptobyte.String) error {
 
 type proposal struct {
 	proposalType           proposalType
-	add                    *add
-	update                 *update
-	remove                 *remove
-	preSharedKey           *preSharedKey
-	reInit                 *reInit
-	externalInit           *externalInit
-	groupContextExtensions *groupContextExtensions
+	add                    *add                    // for proposalTypeAdd
+	update                 *update                 // for proposalTypeUpdate
+	remove                 *remove                 // for proposalTypeRemove
+	preSharedKey           *preSharedKey           // for proposalTypePSK
+	reInit                 *reInit                 // for proposalTypeReinit
+	externalInit           *externalInit           // for proposalTypeExternalInit
+	groupContextExtensions *groupContextExtensions // for proposalTypeGroupContextExtensions
 }
 
 func (prop *proposal) unmarshal(s *cryptobyte.String) error {
@@ -52,8 +52,24 @@ func (prop *proposal) unmarshal(s *cryptobyte.String) error {
 	case proposalTypeAdd:
 		prop.add = new(add)
 		return prop.add.unmarshal(s)
-	case proposalTypeUpdate, proposalTypeRemove, proposalTypePSK, proposalTypeReinit, proposalTypeExternalInit, proposalTypeGroupContextExtensions:
-		return fmt.Errorf("TODO: proposal.unmarshal(%v)", prop.proposalType)
+	case proposalTypeUpdate:
+		prop.update = new(update)
+		return prop.update.unmarshal(s)
+	case proposalTypeRemove:
+		prop.remove = new(remove)
+		return prop.remove.unmarshal(s)
+	case proposalTypePSK:
+		prop.preSharedKey = new(preSharedKey)
+		return prop.preSharedKey.unmarshal(s)
+	case proposalTypeReinit:
+		prop.reInit = new(reInit)
+		return prop.reInit.unmarshal(s)
+	case proposalTypeExternalInit:
+		prop.externalInit = new(externalInit)
+		return prop.externalInit.unmarshal(s)
+	case proposalTypeGroupContextExtensions:
+		prop.groupContextExtensions = new(groupContextExtensions)
+		return prop.groupContextExtensions.unmarshal(s)
 	default:
 		panic("unreachable")
 	}
