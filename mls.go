@@ -92,3 +92,19 @@ func readVector(s *cryptobyte.String, f func(s *cryptobyte.String) error) error 
 	}
 	return nil
 }
+
+func readOptional(s *cryptobyte.String, present *bool) bool {
+	var u8 uint8
+	if !s.ReadUint8(&u8) {
+		return false
+	}
+	switch u8 {
+	case 0:
+		*present = false
+	case 1:
+		*present = true
+	default:
+		return false
+	}
+	return true
+}

@@ -214,3 +214,47 @@ func (hpke *hpkeCiphertext) unmarshal(s *cryptobyte.String) error {
 	}
 	return nil
 }
+
+type updatePathNode struct {
+	encryptionKey       hpkePublicKey
+	encryptedPathSecret []hpkeCiphertext
+}
+
+func (node *updatePathNode) unmarshal(s *cryptobyte.String) error {
+	*node = updatePathNode{}
+
+	if !readOpaqueVec(s, (*[]byte)(&node.encryptionKey)) {
+		return io.ErrUnexpectedEOF
+	}
+
+	return readVector(s, func(s *cryptobyte.String) error {
+		var ciphertext hpkeCiphertext
+		if err := ciphertext.unmarshal(s); err != nil {
+			return err
+		}
+		node.encryptedPathSecret = append(node.encryptedPathSecret, ciphertext)
+		return nil
+	})
+}
+
+type updatePath struct {
+	leafNode leafNode
+	nodes    []updatePathNode
+}
+
+func (up *updatePath) unmarshal(s *cryptobyte.String) error {
+	*up = updatePath{}
+
+	if err := up.leafNode.unmarshal(s); err != nil {
+		return err
+	}
+
+	return readVector(s, func(s *cryptobyte.String) error {
+		var node updatePathNode
+		if err := node.unmarshal(s); err != nil {
+			return err
+		}
+		up.nodes = append(up.nodes, node)
+		return nil
+	})
+}

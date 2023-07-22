@@ -137,16 +137,16 @@ func (content *framedContent) unmarshal(s *cryptobyte.String) error {
 		if !readOpaqueVec(s, &content.applicationData) {
 			return io.ErrUnexpectedEOF
 		}
+		return nil
 	case contentTypeProposal:
 		content.proposal = new(proposal)
-		if err := content.proposal.unmarshal(s); err != nil {
-			return err
-		}
+		return content.proposal.unmarshal(s)
 	case contentTypeCommit:
-		return fmt.Errorf("TODO: framedContent.unmarshal")
+		content.commit = new(commit)
+		return content.commit.unmarshal(s)
+	default:
+		panic("unreachable")
 	}
-
-	return nil
 }
 
 type mlsMessage struct {

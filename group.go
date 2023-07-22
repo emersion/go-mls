@@ -114,15 +114,66 @@ func (t *proposalOrRefType) unmarshal(s *cryptobyte.String) error {
 	}
 }
 
+type proposalRef []byte
+
 type proposalOrRef struct {
-	typ      proposalOrRefType
-	proposal *proposal
-	//reference *reference
+	typ       proposalOrRefType
+	proposal  *proposal   // for proposalOrRefTypeProposal
+	reference proposalRef // for proposalOrRefTypeReference
+}
+
+func (propOrRef *proposalOrRef) unmarshal(s *cryptobyte.String) error {
+	*propOrRef = proposalOrRef{}
+
+	if err := propOrRef.typ.unmarshal(s); err != nil {
+		return err
+	}
+
+	switch propOrRef.typ {
+	case proposalOrRefTypeProposal:
+		propOrRef.proposal = new(proposal)
+		return propOrRef.proposal.unmarshal(s)
+	case proposalOrRefTypeReference:
+		if !readOpaqueVec(s, (*[]byte)(&propOrRef.reference)) {
+			return io.ErrUnexpectedEOF
+		}
+		return nil
+	default:
+		panic("unreachable")
+	}
 }
 
 type commit struct {
 	proposals []proposalOrRef
-	// TODO: path
+	path      *updatePath // optional
+}
+
+func (c *commit) unmarshal(s *cryptobyte.String) error {
+	*c = commit{}
+
+	err := readVector(s, func(s *cryptobyte.String) error {
+		var propOrRef proposalOrRef
+		if err := propOrRef.unmarshal(s); err != nil {
+			return err
+		}
+		c.proposals = append(c.proposals, propOrRef)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	var hasPath bool
+	if !readOptional(s, &hasPath) {
+		return io.ErrUnexpectedEOF
+	} else if hasPath {
+		c.path = new(updatePath)
+		if err := c.path.unmarshal(s); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type groupInfo struct {
