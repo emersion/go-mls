@@ -81,6 +81,14 @@ type remove struct {
 	removed uint32
 }
 
+func (rm *remove) unmarshal(s *cryptobyte.String) error {
+	*rm = remove{}
+	if !s.ReadUint32(&rm.removed) {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+
 type preSharedKey struct {
 	// TODO
 }
