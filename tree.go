@@ -23,8 +23,8 @@ type capabilities struct {
 	credentials  []credentialType
 }
 
-func unmarshalCapabilities(s *cryptobyte.String) (*capabilities, error) {
-	var caps capabilities
+func (caps *capabilities) unmarshal(s *cryptobyte.String) error {
+	*caps = capabilities{}
 
 	err := readVector(s, func(s *cryptobyte.String) error {
 		var ver protocolVersion
@@ -35,7 +35,7 @@ func unmarshalCapabilities(s *cryptobyte.String) (*capabilities, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = readVector(s, func(s *cryptobyte.String) error {
@@ -47,7 +47,7 @@ func unmarshalCapabilities(s *cryptobyte.String) (*capabilities, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = readVector(s, func(s *cryptobyte.String) error {
@@ -59,7 +59,7 @@ func unmarshalCapabilities(s *cryptobyte.String) (*capabilities, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = readVector(s, func(s *cryptobyte.String) error {
@@ -71,7 +71,7 @@ func unmarshalCapabilities(s *cryptobyte.String) (*capabilities, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = readVector(s, func(s *cryptobyte.String) error {
@@ -83,22 +83,22 @@ func unmarshalCapabilities(s *cryptobyte.String) (*capabilities, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &caps, nil
+	return nil
 }
 
 type lifetime struct {
 	notBefore, notAfter uint64
 }
 
-func unmarshalLifetime(s *cryptobyte.String) (*lifetime, error) {
-	var lifetime lifetime
-	if !s.ReadUint64(&lifetime.notBefore) || !s.ReadUint64(&lifetime.notAfter) {
-		return nil, io.ErrUnexpectedEOF
+func (lt *lifetime) unmarshal(s *cryptobyte.String) error {
+	*lt = lifetime{}
+	if !s.ReadUint64(&lt.notBefore) || !s.ReadUint64(&lt.notAfter) {
+		return io.ErrUnexpectedEOF
 	}
-	return &lifetime, nil
+	return nil
 }
 
 type extensionType uint16
@@ -144,32 +144,29 @@ type leafNode struct {
 	signature  []byte
 }
 
-func unmarshalLeafNode(s *cryptobyte.String) (*leafNode, error) {
-	var node leafNode
+func (node *leafNode) unmarshal(s *cryptobyte.String) error {
+	*node = leafNode{}
 
 	if !readOpaqueVec(s, (*[]byte)(&node.encryptionKey)) || !readOpaqueVec(s, (*[]byte)(&node.signatureKey)) {
-		return nil, io.ErrUnexpectedEOF
+		return io.ErrUnexpectedEOF
 	}
 
-	cred, err := unmarshalCredential(s)
-	if err != nil {
-		return nil, err
+	if err := node.credential.unmarshal(s); err != nil {
+		return err
 	}
-	node.credential = *cred
-
-	caps, err := unmarshalCapabilities(s)
-	if err != nil {
-		return nil, err
+	if err := node.capabilities.unmarshal(s); err != nil {
+		return err
 	}
-	node.capabilities = *caps
 
 	if !s.ReadUint8((*uint8)(&node.leafNodeSource)) {
-		return nil, io.ErrUnexpectedEOF
+		return io.ErrUnexpectedEOF
 	}
 
+	var err error
 	switch node.leafNodeSource {
 	case leafNodeSourceKeyPackage:
-		node.lifetime, err = unmarshalLifetime(s)
+		node.lifetime = new(lifetime)
+		err = node.lifetime.unmarshal(s)
 	case leafNodeSourceUpdate:
 		// nothing to do
 	case leafNodeSourceCommit:
@@ -180,20 +177,20 @@ func unmarshalLeafNode(s *cryptobyte.String) (*leafNode, error) {
 		err = fmt.Errorf("mls: invalid leaf node source %d", node.leafNodeSource)
 	}
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	exts, err := unmarshalExtensionVec(s)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	node.extensions = exts
 
 	if !readOpaqueVec(s, &node.signature) {
-		return nil, io.ErrUnexpectedEOF
+		return io.ErrUnexpectedEOF
 	}
 
-	return &node, nil
+	return nil
 }
 
 type hpkeCiphertext struct {
@@ -201,10 +198,10 @@ type hpkeCiphertext struct {
 	ciphertext []byte
 }
 
-func unmarshalHPKECiphertext(s *cryptobyte.String) (*hpkeCiphertext, error) {
-	var hpke hpkeCiphertext
+func (hpke *hpkeCiphertext) unmarshal(s *cryptobyte.String) error {
+	*hpke = hpkeCiphertext{}
 	if !readOpaqueVec(s, &hpke.kemOutput) || !readOpaqueVec(s, &hpke.ciphertext) {
-		return nil, io.ErrUnexpectedEOF
+		return io.ErrUnexpectedEOF
 	}
-	return &hpke, nil
+	return nil
 }

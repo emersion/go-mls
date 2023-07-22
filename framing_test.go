@@ -48,8 +48,8 @@ func testMessages(t *testing.T, tc *messagesTest) {
 	for _, msg := range msgs {
 		t.Run(msg.name, func(t *testing.T) {
 			s := cryptobyte.String(msg.b)
-			_, err := unmarshalMLSMessage(&s)
-			if err != nil {
+			var msg mlsMessage
+			if err := msg.unmarshal(&s); err != nil {
 				t.Fatal(err)
 			}
 			if !s.Empty() {

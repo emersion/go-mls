@@ -26,19 +26,21 @@ type credential struct {
 	certificates   [][]byte // for credentialTypeX509
 }
 
-func unmarshalCredential(s *cryptobyte.String) (*credential, error) {
-	var cred credential
+func (cred *credential) unmarshal(s *cryptobyte.String) error {
+	*cred = credential{}
+
 	if !s.ReadUint16((*uint16)(&cred.credentialType)) {
-		return nil, io.ErrUnexpectedEOF
+		return io.ErrUnexpectedEOF
 	}
 
 	switch cred.credentialType {
 	case credentialTypeBasic:
 		if !readOpaqueVec(s, &cred.identity) {
-			return nil, io.ErrUnexpectedEOF
+			return io.ErrUnexpectedEOF
 		}
+		return nil
 	case credentialTypeX509:
-		err := readVector(s, func(s *cryptobyte.String) error {
+		return readVector(s, func(s *cryptobyte.String) error {
 			var cert []byte
 			if !readOpaqueVec(s, &cert) {
 				return io.ErrUnexpectedEOF
@@ -46,12 +48,7 @@ func unmarshalCredential(s *cryptobyte.String) (*credential, error) {
 			cred.certificates = append(cred.certificates, cert)
 			return nil
 		})
-		if err != nil {
-			return nil, err
-		}
 	default:
-		return nil, fmt.Errorf("mls: invalid credential type %d", cred.credentialType)
+		return fmt.Errorf("mls: invalid credential type %d", cred.credentialType)
 	}
-
-	return &cred, nil
 }

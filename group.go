@@ -87,26 +87,24 @@ type groupInfo struct {
 	signature       []byte
 }
 
-func unmarshalGroupInfo(s *cryptobyte.String) (*groupInfo, error) {
-	var info groupInfo
+func (info *groupInfo) unmarshal(s *cryptobyte.String) error {
+	*info = groupInfo{}
 
-	ctx, err := unmarshalGroupContext(s)
-	if err != nil {
-		return nil, err
+	if err := info.groupContext.unmarshal(s); err != nil {
+		return err
 	}
-	info.groupContext = *ctx
 
 	exts, err := unmarshalExtensionVec(s)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	info.extensions = exts
 
 	if !readOpaqueVec(s, &info.confirmationTag) || !s.ReadUint32(&info.signer) || !readOpaqueVec(s, &info.signature) {
-		return nil, err
+		return err
 	}
 
-	return &info, nil
+	return nil
 }
 
 type groupContext struct {
@@ -119,8 +117,9 @@ type groupContext struct {
 	extensions              []extension
 }
 
-func unmarshalGroupContext(s *cryptobyte.String) (*groupContext, error) {
-	var ctx groupContext
+func (ctx *groupContext) unmarshal(s *cryptobyte.String) error {
+	*ctx = groupContext{}
+
 	ok := s.ReadUint16((*uint16)(&ctx.version)) &&
 		s.ReadUint16((*uint16)(&ctx.cipherSuite)) &&
 		readOpaqueVec(s, (*[]byte)(&ctx.groupID)) &&
@@ -128,16 +127,16 @@ func unmarshalGroupContext(s *cryptobyte.String) (*groupContext, error) {
 		readOpaqueVec(s, &ctx.treeHash) &&
 		readOpaqueVec(s, &ctx.confirmedTranscriptHash)
 	if !ok {
-		return nil, io.ErrUnexpectedEOF
+		return io.ErrUnexpectedEOF
 	}
 
 	exts, err := unmarshalExtensionVec(s)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	ctx.extensions = exts
 
-	return &ctx, nil
+	return nil
 }
 
 type welcome struct {
@@ -146,29 +145,30 @@ type welcome struct {
 	encryptedGroupInfo []byte
 }
 
-func unmarshalWelcome(s *cryptobyte.String) (*welcome, error) {
-	var welcome welcome
-	if !s.ReadUint16((*uint16)(&welcome.cipherSuite)) {
-		return nil, io.ErrUnexpectedEOF
+func (w *welcome) unmarshal(s *cryptobyte.String) error {
+	*w = welcome{}
+
+	if !s.ReadUint16((*uint16)(&w.cipherSuite)) {
+		return io.ErrUnexpectedEOF
 	}
 
 	err := readVector(s, func(s *cryptobyte.String) error {
-		sec, err := unmarshalEncryptedGroupSecrets(s)
-		if err != nil {
+		var sec encryptedGroupSecrets
+		if err := sec.unmarshal(s); err != nil {
 			return err
 		}
-		welcome.secrets = append(welcome.secrets, *sec)
+		w.secrets = append(w.secrets, sec)
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	if !readOpaqueVec(s, &welcome.encryptedGroupInfo) {
-		return nil, io.ErrUnexpectedEOF
+	if !readOpaqueVec(s, &w.encryptedGroupInfo) {
+		return io.ErrUnexpectedEOF
 	}
 
-	return &welcome, nil
+	return nil
 }
 
 type encryptedGroupSecrets struct {
@@ -176,15 +176,13 @@ type encryptedGroupSecrets struct {
 	encryptedGroupSecrets hpkeCiphertext
 }
 
-func unmarshalEncryptedGroupSecrets(s *cryptobyte.String) (*encryptedGroupSecrets, error) {
-	var sec encryptedGroupSecrets
+func (sec *encryptedGroupSecrets) unmarshal(s *cryptobyte.String) error {
+	*sec = encryptedGroupSecrets{}
 	if !readOpaqueVec(s, (*[]byte)(&sec.newMember)) {
-		return nil, io.ErrUnexpectedEOF
+		return io.ErrUnexpectedEOF
 	}
-	hpke, err := unmarshalHPKECiphertext(s)
-	if err != nil {
-		return nil, err
+	if err := sec.encryptedGroupSecrets.unmarshal(s); err != nil {
+		return err
 	}
-	sec.encryptedGroupSecrets = *hpke
-	return &sec, nil
+	return nil
 }

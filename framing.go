@@ -36,26 +36,26 @@ type sender struct {
 	senderIndex uint32 // for senderTypeExternal
 }
 
-func unmarshalSender(s *cryptobyte.String) (*sender, error) {
-	var sender sender
-	if !s.ReadUint8((*uint8)(&sender.senderType)) {
-		return nil, io.ErrUnexpectedEOF
+func (snd *sender) unmarshal(s *cryptobyte.String) error {
+	*snd = sender{}
+	if !s.ReadUint8((*uint8)(&snd.senderType)) {
+		return io.ErrUnexpectedEOF
 	}
-	switch sender.senderType {
+	switch snd.senderType {
 	case senderTypeMember:
-		if !s.ReadUint32(&sender.leafIndex) {
-			return nil, io.ErrUnexpectedEOF
+		if !s.ReadUint32(&snd.leafIndex) {
+			return io.ErrUnexpectedEOF
 		}
 	case senderTypeExternal:
-		if !s.ReadUint32(&sender.senderIndex) {
-			return nil, io.ErrUnexpectedEOF
+		if !s.ReadUint32(&snd.senderIndex) {
+			return io.ErrUnexpectedEOF
 		}
 	case senderTypeNewMemberProposal, senderTypeNewMemberCommit:
 		// nothing to do
 	default:
-		return nil, fmt.Errorf("mls: invalid sender type %d", sender.senderType)
+		return fmt.Errorf("mls: invalid sender type %d", snd.senderType)
 	}
-	return &sender, nil
+	return nil
 }
 
 type wireFormat uint16
@@ -84,36 +84,33 @@ type framedContent struct {
 	commit          *commit   // for contentTypeCommit
 }
 
-func unmarshalFramedContent(s *cryptobyte.String) (*framedContent, error) {
-	var framedContent framedContent
-	if !readOpaqueVec(s, (*[]byte)(&framedContent.groupID)) || !s.ReadUint64(&framedContent.epoch) {
-		return nil, io.ErrUnexpectedEOF
+func (content *framedContent) unmarshal(s *cryptobyte.String) error {
+	*content = framedContent{}
+
+	if !readOpaqueVec(s, (*[]byte)(&content.groupID)) || !s.ReadUint64(&content.epoch) {
+		return io.ErrUnexpectedEOF
+	}
+	if err := content.sender.unmarshal(s); err != nil {
+		return err
+	}
+	if !readOpaqueVec(s, &content.authenticatedData) || !s.ReadUint8((*uint8)(&content.contentType)) {
+		return io.ErrUnexpectedEOF
 	}
 
-	sender, err := unmarshalSender(s)
-	if err != nil {
-		return nil, err
-	}
-	framedContent.sender = *sender
-
-	if !readOpaqueVec(s, &framedContent.authenticatedData) || !s.ReadUint8((*uint8)(&framedContent.contentType)) {
-		return nil, io.ErrUnexpectedEOF
-	}
-
-	switch framedContent.contentType {
+	switch content.contentType {
 	case contentTypeApplication:
-		if !readOpaqueVec(s, &framedContent.applicationData) {
-			return nil, io.ErrUnexpectedEOF
+		if !readOpaqueVec(s, &content.applicationData) {
+			return io.ErrUnexpectedEOF
 		}
 	case contentTypeProposal:
-		return nil, fmt.Errorf("TODO: unmarshalFramedContent")
+		return fmt.Errorf("TODO: framedContent.unmarshal")
 	case contentTypeCommit:
-		return nil, fmt.Errorf("TODO: unmarshalFramedContent")
+		return fmt.Errorf("TODO: framedContent.unmarshal")
 	default:
-		return nil, fmt.Errorf("mls: invalid content type %d", framedContent.contentType)
+		return fmt.Errorf("mls: invalid content type %d", content.contentType)
 	}
 
-	return &framedContent, nil
+	return nil
 }
 
 type mlsMessage struct {
@@ -126,36 +123,36 @@ type mlsMessage struct {
 	keyPackage     *keyPackage
 }
 
-func unmarshalMLSMessage(s *cryptobyte.String) (*mlsMessage, error) {
-	var msg mlsMessage
+func (msg *mlsMessage) unmarshal(s *cryptobyte.String) error {
+	*msg = mlsMessage{}
+
 	if !s.ReadUint16((*uint16)(&msg.version)) || !s.ReadUint16((*uint16)(&msg.wireFormat)) {
-		return nil, io.ErrUnexpectedEOF
+		return io.ErrUnexpectedEOF
 	}
 
 	if msg.version != protocolVersionMLS10 {
-		return nil, fmt.Errorf("mls: invalid protocol version %d", msg.version)
+		return fmt.Errorf("mls: invalid protocol version %d", msg.version)
 	}
 
-	var err error
 	switch msg.wireFormat {
 	case wireFormatMLSPublicMessage:
-		msg.publicMessage, err = unmarshalPublicMessage(s)
+		msg.publicMessage = new(publicMessage)
+		return msg.publicMessage.unmarshal(s)
 	case wireFormatMLSPrivateMessage:
-		msg.privateMessage, err = unmarshalPrivateMessage(s)
+		msg.privateMessage = new(privateMessage)
+		return msg.privateMessage.unmarshal(s)
 	case wireFormatMLSWelcome:
-		msg.welcome, err = unmarshalWelcome(s)
+		msg.welcome = new(welcome)
+		return msg.welcome.unmarshal(s)
 	case wireFormatMLSGroupInfo:
-		msg.groupInfo, err = unmarshalGroupInfo(s)
+		msg.groupInfo = new(groupInfo)
+		return msg.groupInfo.unmarshal(s)
 	case wireFormatMLSKeyPackage:
-		msg.keyPackage, err = unmarshalKeyPackage(s)
+		msg.keyPackage = new(keyPackage)
+		return msg.keyPackage.unmarshal(s)
 	default:
-		err = fmt.Errorf("mls: invalid wire format %d", msg.wireFormat)
+		return fmt.Errorf("mls: invalid wire format %d", msg.wireFormat)
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	return &msg, nil
 }
 
 type authenticatedContent struct {
@@ -169,19 +166,20 @@ type framedContentAuthData struct {
 	confirmationTag []byte // for contentTypeCommit
 }
 
-func unmarshalFramedContentAuthData(s *cryptobyte.String, ct contentType) (*framedContentAuthData, error) {
-	var authData framedContentAuthData
+func (authData *framedContentAuthData) unmarshal(s *cryptobyte.String, ct contentType) error {
+	*authData = framedContentAuthData{}
+
 	if !readOpaqueVec(s, &authData.signature) {
-		return nil, io.ErrUnexpectedEOF
+		return io.ErrUnexpectedEOF
 	}
 
 	if ct == contentTypeCommit {
 		if !readOpaqueVec(s, &authData.confirmationTag) {
-			return nil, io.ErrUnexpectedEOF
+			return io.ErrUnexpectedEOF
 		}
 	}
 
-	return &authData, nil
+	return nil
 }
 
 type publicMessage struct {
@@ -190,28 +188,23 @@ type publicMessage struct {
 	membershipTag []byte // for senderTypeMember
 }
 
-func unmarshalPublicMessage(s *cryptobyte.String) (*publicMessage, error) {
-	content, err := unmarshalFramedContent(s)
-	if err != nil {
-		return nil, err
+func (msg *publicMessage) unmarshal(s *cryptobyte.String) error {
+	*msg = publicMessage{}
+
+	if err := msg.content.unmarshal(s); err != nil {
+		return err
+	}
+	if err := msg.auth.unmarshal(s, msg.content.contentType); err != nil {
+		return err
 	}
 
-	auth, err := unmarshalFramedContentAuthData(s, content.contentType)
-	if err != nil {
-		return nil, err
-	}
-
-	msg := publicMessage{
-		content: *content,
-		auth:    *auth,
-	}
-	if content.sender.senderType == senderTypeMember {
+	if msg.content.sender.senderType == senderTypeMember {
 		if !readOpaqueVec(s, &msg.membershipTag) {
-			return nil, io.ErrUnexpectedEOF
+			return io.ErrUnexpectedEOF
 		}
 	}
 
-	return &msg, nil
+	return nil
 }
 
 type privateMessage struct {
@@ -223,15 +216,18 @@ type privateMessage struct {
 	ciphertext          []byte
 }
 
-func unmarshalPrivateMessage(s *cryptobyte.String) (*privateMessage, error) {
-	var msg privateMessage
-	if !readOpaqueVec(s, (*[]byte)(&msg.groupID)) || !s.ReadUint64(&msg.epoch) || !s.ReadUint8((*uint8)(&msg.contentType)) {
-		return nil, io.ErrUnexpectedEOF
+func (msg *privateMessage) unmarshal(s *cryptobyte.String) error {
+	*msg = privateMessage{}
+	ok := readOpaqueVec(s, (*[]byte)(&msg.groupID)) &&
+		s.ReadUint64(&msg.epoch) &&
+		s.ReadUint8((*uint8)(&msg.contentType)) &&
+		readOpaqueVec(s, &msg.authenticatedData) &&
+		readOpaqueVec(s, &msg.encryptedSenderData) &&
+		readOpaqueVec(s, &msg.ciphertext)
+	if !ok {
+		return io.ErrUnexpectedEOF
 	}
-	if !readOpaqueVec(s, &msg.authenticatedData) || !readOpaqueVec(s, &msg.encryptedSenderData) || !readOpaqueVec(s, &msg.ciphertext) {
-		return nil, io.ErrUnexpectedEOF
-	}
-	return &msg, nil
+	return nil
 }
 
 type privateMessageContent struct {

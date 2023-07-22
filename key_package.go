@@ -15,32 +15,31 @@ type keyPackage struct {
 	signature   []byte
 }
 
-func unmarshalKeyPackage(s *cryptobyte.String) (*keyPackage, error) {
-	var pkg keyPackage
+func (pkg *keyPackage) unmarshal(s *cryptobyte.String) error {
+	*pkg = keyPackage{}
+
 	ok := s.ReadUint16((*uint16)(&pkg.version)) &&
 		s.ReadUint16((*uint16)(&pkg.cipherSuite)) &&
 		readOpaqueVec(s, (*[]byte)(&pkg.initKey))
 	if !ok {
-		return nil, io.ErrUnexpectedEOF
+		return io.ErrUnexpectedEOF
 	}
 
-	leafNode, err := unmarshalLeafNode(s)
-	if err != nil {
-		return nil, err
+	if err := pkg.leafNode.unmarshal(s); err != nil {
+		return err
 	}
-	pkg.leafNode = *leafNode
 
 	exts, err := unmarshalExtensionVec(s)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	pkg.extensions = exts
 
 	if !readOpaqueVec(s, &pkg.signature) {
-		return nil, err
+		return err
 	}
 
-	return &pkg, nil
+	return nil
 }
 
 type keyPackageRef []byte
