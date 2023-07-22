@@ -194,6 +194,17 @@ func (msg *mlsMessage) unmarshal(s *cryptobyte.String) error {
 	}
 }
 
+func (msg *mlsMessage) marshal(b *cryptobyte.Builder) {
+	b.AddUint16(uint16(msg.version))
+	b.AddUint16(uint16(msg.wireFormat))
+	switch msg.wireFormat {
+	case wireFormatMLSKeyPackage:
+		msg.keyPackage.marshal(b)
+	default:
+		b.SetError(fmt.Errorf("TODO: mlsMessage.marshal"))
+	}
+}
+
 type authenticatedContent struct {
 	wireFormat wireFormat
 	content    framedContent

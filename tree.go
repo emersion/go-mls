@@ -48,6 +48,10 @@ func (src *leafNodeSource) unmarshal(s *cryptobyte.String) error {
 	}
 }
 
+func (src leafNodeSource) marshal(b *cryptobyte.Builder) {
+	b.AddUint8(uint8(src))
+}
+
 type capabilities struct {
 	versions     []protocolVersion
 	cipherSuites []cipherSuite
@@ -124,6 +128,28 @@ func (caps *capabilities) unmarshal(s *cryptobyte.String) error {
 	return nil
 }
 
+func (caps *capabilities) marshal(b *cryptobyte.Builder) {
+	writeVector(b, len(caps.versions), func(b *cryptobyte.Builder, i int) {
+		b.AddUint16(uint16(caps.versions[i]))
+	})
+
+	writeVector(b, len(caps.cipherSuites), func(b *cryptobyte.Builder, i int) {
+		b.AddUint16(uint16(caps.cipherSuites[i]))
+	})
+
+	writeVector(b, len(caps.extensions), func(b *cryptobyte.Builder, i int) {
+		b.AddUint16(uint16(caps.extensions[i]))
+	})
+
+	writeVector(b, len(caps.proposals), func(b *cryptobyte.Builder, i int) {
+		b.AddUint16(uint16(caps.proposals[i]))
+	})
+
+	writeVector(b, len(caps.credentials), func(b *cryptobyte.Builder, i int) {
+		b.AddUint16(uint16(caps.credentials[i]))
+	})
+}
+
 type lifetime struct {
 	notBefore, notAfter uint64
 }
@@ -134,6 +160,11 @@ func (lt *lifetime) unmarshal(s *cryptobyte.String) error {
 		return io.ErrUnexpectedEOF
 	}
 	return nil
+}
+
+func (lt *lifetime) marshal(b *cryptobyte.Builder) {
+	b.AddUint64(lt.notBefore)
+	b.AddUint64(lt.notAfter)
 }
 
 type extensionType uint16
@@ -163,6 +194,14 @@ func unmarshalExtensionVec(s *cryptobyte.String) ([]extension, error) {
 		return nil
 	})
 	return exts, err
+}
+
+func marshalExtensionVec(b *cryptobyte.Builder, exts []extension) {
+	writeVector(b, len(exts), func(b *cryptobyte.Builder, i int) {
+		ext := exts[i]
+		b.AddUint16(uint16(ext.extensionType))
+		writeOpaqueVec(b, ext.extensionData)
+	})
 }
 
 type leafNode struct {
@@ -221,6 +260,22 @@ func (node *leafNode) unmarshal(s *cryptobyte.String) error {
 	}
 
 	return nil
+}
+
+func (node *leafNode) marshal(b *cryptobyte.Builder) {
+	writeOpaqueVec(b, []byte(node.encryptionKey))
+	writeOpaqueVec(b, []byte(node.signatureKey))
+	node.credential.marshal(b)
+	node.capabilities.marshal(b)
+	node.leafNodeSource.marshal(b)
+	switch node.leafNodeSource {
+	case leafNodeSourceKeyPackage:
+		node.lifetime.marshal(b)
+	case leafNodeSourceCommit:
+		writeOpaqueVec(b, node.parentHash)
+	}
+	marshalExtensionVec(b, node.extensions)
+	writeOpaqueVec(b, []byte(node.signature))
 }
 
 type hpkeCiphertext struct {

@@ -1,6 +1,7 @@
 package mls
 
 import (
+	"bytes"
 	"io"
 
 	"golang.org/x/crypto/cryptobyte"
@@ -42,4 +43,33 @@ func (pkg *keyPackage) unmarshal(s *cryptobyte.String) error {
 	return nil
 }
 
+func (pkg *keyPackage) marshal(b *cryptobyte.Builder) {
+	b.AddUint16(uint16(pkg.version))
+	b.AddUint16(uint16(pkg.cipherSuite))
+	writeOpaqueVec(b, []byte(pkg.initKey))
+	pkg.leafNode.marshal(b)
+	marshalExtensionVec(b, pkg.extensions)
+	writeOpaqueVec(b, pkg.signature)
+}
+
+func (pkg *keyPackage) generateRef() (keyPackageRef, error) {
+	var b cryptobyte.Builder
+	pkg.marshal(&b)
+	raw, err := b.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	hash, err := pkg.cipherSuite.refHash([]byte("MLS 1.0 KeyPackage Reference"), raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return keyPackageRef(hash), nil
+}
+
 type keyPackageRef []byte
+
+func (ref keyPackageRef) Equal(other keyPackageRef) bool {
+	return bytes.Equal([]byte(ref), []byte(other))
+}

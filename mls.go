@@ -93,6 +93,23 @@ func readVector(s *cryptobyte.String, f func(s *cryptobyte.String) error) error 
 	return nil
 }
 
+func writeVector(b *cryptobyte.Builder, n int, f func(b *cryptobyte.Builder, i int)) {
+	// We don't know the total size in advance, and the vector is prefixed with
+	// a varint, so we can't avoid the temporary buffer here
+	var child cryptobyte.Builder
+	for i := 0; i < n; i++ {
+		f(&child, i)
+	}
+
+	raw, err := child.Bytes()
+	if err != nil {
+		b.SetError(err)
+		return
+	}
+
+	writeOpaqueVec(b, raw)
+}
+
 func readOptional(s *cryptobyte.String, present *bool) bool {
 	var u8 uint8
 	if !s.ReadUint8(&u8) {

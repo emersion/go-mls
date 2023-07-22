@@ -52,3 +52,17 @@ func (cred *credential) unmarshal(s *cryptobyte.String) error {
 		return fmt.Errorf("mls: invalid credential type %d", cred.credentialType)
 	}
 }
+
+func (cred *credential) marshal(b *cryptobyte.Builder) {
+	b.AddUint16(uint16(cred.credentialType))
+	switch cred.credentialType {
+	case credentialTypeBasic:
+		writeOpaqueVec(b, cred.identity)
+	case credentialTypeX509:
+		writeVector(b, len(cred.certificates), func(b *cryptobyte.Builder, i int) {
+			writeOpaqueVec(b, cred.certificates[i])
+		})
+	default:
+		panic("unreachable")
+	}
+}
