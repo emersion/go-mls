@@ -125,6 +125,14 @@ type externalInit struct {
 	kemOutput []byte
 }
 
+func (ei *externalInit) unmarshal(s *cryptobyte.String) error {
+	*ei = externalInit{}
+	if !readOpaqueVec(s, &ei.kemOutput) {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+
 type groupContextExtensions struct {
 	// TODO
 }
