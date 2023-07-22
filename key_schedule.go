@@ -30,6 +30,10 @@ func (ctx *groupContext) unmarshal(s *cryptobyte.String) error {
 		return io.ErrUnexpectedEOF
 	}
 
+	if ctx.version != protocolVersionMLS10 {
+		return fmt.Errorf("mls: invalid protocol version %d", ctx.version)
+	}
+
 	exts, err := unmarshalExtensionVec(s)
 	if err != nil {
 		return err
