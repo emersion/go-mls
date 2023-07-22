@@ -24,7 +24,7 @@ func testMessages(t *testing.T, tc map[string]testBytes) {
 
 		// TODO
 		//{"ratchet_tree", nil},
-		//{"group_secrets", new(groupSecrets)},
+		{"group_secrets", new(groupSecrets)},
 
 		{"add_proposal", new(add)},
 		{"update_proposal", new(update)},

@@ -258,6 +258,36 @@ func (info *groupInfo) unmarshal(s *cryptobyte.String) error {
 	return nil
 }
 
+type groupSecrets struct {
+	joinerSecret []byte
+	pathSecret   []byte // optional
+	psks         []preSharedKeyID
+}
+
+func (sec *groupSecrets) unmarshal(s *cryptobyte.String) error {
+	*sec = groupSecrets{}
+
+	if !readOpaqueVec(s, &sec.joinerSecret) {
+		return io.ErrUnexpectedEOF
+	}
+
+	var hasPathSecret bool
+	if !readOptional(s, &hasPathSecret) {
+		return io.ErrUnexpectedEOF
+	} else if hasPathSecret && !readOpaqueVec(s, &sec.pathSecret) {
+		return io.ErrUnexpectedEOF
+	}
+
+	return readVector(s, func(s *cryptobyte.String) error {
+		var psk preSharedKeyID
+		if err := psk.unmarshal(s); err != nil {
+			return err
+		}
+		sec.psks = append(sec.psks, psk)
+		return nil
+	})
+}
+
 type welcome struct {
 	cipherSuite        cipherSuite
 	secrets            []encryptedGroupSecrets
