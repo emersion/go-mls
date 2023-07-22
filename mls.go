@@ -125,3 +125,28 @@ func readOptional(s *cryptobyte.String, present *bool) bool {
 	}
 	return true
 }
+
+type unmarshaler interface {
+	unmarshal(*cryptobyte.String) error
+}
+
+type marshaler interface {
+	marshal(*cryptobyte.Builder)
+}
+
+func unmarshal(raw []byte, v unmarshaler) error {
+	s := cryptobyte.String(raw)
+	if err := v.unmarshal(&s); err != nil {
+		return err
+	}
+	if !s.Empty() {
+		return fmt.Errorf("mls: input for %T contains %v excess bytes", v, len(s))
+	}
+	return nil
+}
+
+func marshal(v marshaler) ([]byte, error) {
+	var b cryptobyte.Builder
+	v.marshal(&b)
+	return b.Bytes()
+}

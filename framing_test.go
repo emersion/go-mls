@@ -4,17 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"testing"
-
-	"golang.org/x/crypto/cryptobyte"
 )
-
-type unmarshaler interface {
-	unmarshal(*cryptobyte.String) error
-}
-
-type marshaler interface {
-	marshal(*cryptobyte.Builder)
-}
 
 func testMessages(t *testing.T, tc map[string]testBytes) {
 	msgs := []struct {
@@ -49,20 +39,14 @@ func testMessages(t *testing.T, tc map[string]testBytes) {
 			if !ok {
 				t.Fatal("reference blob not found")
 			}
-			s := cryptobyte.String(raw)
-			if err := msg.v.unmarshal(&s); err != nil {
+			if err := unmarshal(raw, msg.v); err != nil {
 				t.Fatalf("unmarshal() = %v", err)
-			}
-			if !s.Empty() {
-				t.Errorf("%v bytes unconsumed", len(s))
 			}
 
 			// TODO: enable for all messages
 			if msg.name == "mls_key_package" {
 				v := msg.v.(marshaler)
-				var b cryptobyte.Builder
-				v.marshal(&b)
-				out, err := b.Bytes()
+				out, err := marshal(v)
 				if err != nil {
 					t.Errorf("marshal() = %v", err)
 				} else if !bytes.Equal(out, raw) {
