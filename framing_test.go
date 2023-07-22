@@ -32,7 +32,7 @@ func testMessages(t *testing.T, tc map[string]testBytes) {
 		{"pre_shared_key_proposal", new(preSharedKey)},
 		{"re_init_proposal", new(reInit)},
 		{"external_init_proposal", new(externalInit)},
-		//{"group_context_extensions_proposal", new(groupContextExtensions)},
+		{"group_context_extensions_proposal", new(groupContextExtensions)},
 
 		{"commit", new(commit)},
 

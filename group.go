@@ -134,7 +134,19 @@ func (ei *externalInit) unmarshal(s *cryptobyte.String) error {
 }
 
 type groupContextExtensions struct {
-	// TODO
+	extensions []extension
+}
+
+func (exts *groupContextExtensions) unmarshal(s *cryptobyte.String) error {
+	*exts = groupContextExtensions{}
+
+	l, err := unmarshalExtensionVec(s)
+	if err != nil {
+		return err
+	}
+	exts.extensions = l
+
+	return nil
 }
 
 type proposalOrRefType uint8
