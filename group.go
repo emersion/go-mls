@@ -105,6 +105,22 @@ type reInit struct {
 	extensions  []extension
 }
 
+func (ri *reInit) unmarshal(s *cryptobyte.String) error {
+	*ri = reInit{}
+
+	if !readOpaqueVec(s, (*[]byte)(&ri.groupID)) || !s.ReadUint16((*uint16)(&ri.version)) || !s.ReadUint16((*uint16)(&ri.cipherSuite)) {
+		return io.ErrUnexpectedEOF
+	}
+
+	exts, err := unmarshalExtensionVec(s)
+	if err != nil {
+		return err
+	}
+	ri.extensions = exts
+
+	return nil
+}
+
 type externalInit struct {
 	kemOutput []byte
 }
