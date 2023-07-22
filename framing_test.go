@@ -7,68 +7,50 @@ import (
 	"golang.org/x/crypto/cryptobyte"
 )
 
-type messagesTest struct {
-	MLSWelcome    testBytes `json:"mls_welcome"`
-	MLSGroupInfo  testBytes `json:"mls_group_info"`
-	MLSKeyPackage testBytes `json:"mls_key_package"`
-
-	RatchetTree  testBytes `json:"ratchet_tree"`
-	GroupSecrets testBytes `json:"group_secrets"`
-
-	AddProposal                    testBytes `json:"add_proposal"`
-	UpdateProposal                 testBytes `json:"update_proposal"`
-	RemoveProposal                 testBytes `json:"remove_proposal"`
-	PreSharedKeyProposal           testBytes `json:"pre_shared_key_proposal"`
-	ReInitProposal                 testBytes `json:"re_init_proposal"`
-	ExternalInitProposal           testBytes `json:"external_init_proposal"`
-	GroupContextExtensionsProposal testBytes `json:"group_context_extensions_proposal"`
-
-	Commit testBytes `json:"commit"`
-
-	PublicMessageApplication testBytes `json:"public_message_application"`
-	PublicMessageProposal    testBytes `json:"public_message_proposal"`
-	PublicMessageCommit      testBytes `json:"public_message_commit"`
-	PrivateMessage           testBytes `json:"private_message"`
+type unmarshaler interface {
+	unmarshal(*cryptobyte.String) error
 }
 
-func testMessages(t *testing.T, tc *messagesTest) {
+func testMessages(t *testing.T, tc map[string]testBytes) {
+	// TODO: test decoding → encoding
+
 	msgs := []struct {
 		name string
-		b    []byte
+		v    unmarshaler
 	}{
-		{"mls_welcome", []byte(tc.MLSWelcome)},
-		{"mls_group_info", []byte(tc.MLSGroupInfo)},
-		{"mls_key_package", []byte(tc.MLSKeyPackage)},
-		{"public_message_application", []byte(tc.PublicMessageApplication)},
-		{"public_message_proposal", []byte(tc.PublicMessageProposal)},
-		{"public_message_commit", []byte(tc.PublicMessageCommit)},
-		{"private_message", []byte(tc.PrivateMessage)},
+		{"mls_welcome", new(mlsMessage)},
+		{"mls_group_info", new(mlsMessage)},
+		{"mls_key_package", new(mlsMessage)},
+		{"public_message_application", new(mlsMessage)},
+		{"public_message_proposal", new(mlsMessage)},
+		{"public_message_commit", new(mlsMessage)},
+		{"private_message", new(mlsMessage)},
+		// TODO: other messages
 	}
-
 	for _, msg := range msgs {
 		t.Run(msg.name, func(t *testing.T) {
-			s := cryptobyte.String(msg.b)
-			var msg mlsMessage
-			if err := msg.unmarshal(&s); err != nil {
+			raw, ok := tc[msg.name]
+			if !ok {
+				t.Fatal("reference blob not found")
+			}
+			s := cryptobyte.String(raw)
+			if err := msg.v.unmarshal(&s); err != nil {
 				t.Fatal(err)
 			}
 			if !s.Empty() {
 				t.Errorf("%v bytes unconsumed", len(s))
 			}
-			// TODO: test decoding → encoding
 		})
 	}
-
-	// TODO: other messages
 }
 
 func TestMessages(t *testing.T) {
-	var tests []messagesTest
+	var tests []map[string]testBytes
 	loadTestVector(t, "testdata/messages.json", &tests)
 
 	for i, tc := range tests {
 		t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
-			testMessages(t, &tc)
+			testMessages(t, tc)
 		})
 	}
 }
