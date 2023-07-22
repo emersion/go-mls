@@ -90,7 +90,12 @@ func (rm *remove) unmarshal(s *cryptobyte.String) error {
 }
 
 type preSharedKey struct {
-	// TODO
+	psk preSharedKeyID
+}
+
+func (psk *preSharedKey) unmarshal(s *cryptobyte.String) error {
+	*psk = preSharedKey{}
+	return psk.psk.unmarshal(s)
 }
 
 type reInit struct {
@@ -213,38 +218,6 @@ func (info *groupInfo) unmarshal(s *cryptobyte.String) error {
 	if !readOpaqueVec(s, &info.confirmationTag) || !s.ReadUint32(&info.signer) || !readOpaqueVec(s, &info.signature) {
 		return err
 	}
-
-	return nil
-}
-
-type groupContext struct {
-	version                 protocolVersion
-	cipherSuite             cipherSuite
-	groupID                 GroupID
-	epoch                   uint64
-	treeHash                []byte
-	confirmedTranscriptHash []byte
-	extensions              []extension
-}
-
-func (ctx *groupContext) unmarshal(s *cryptobyte.String) error {
-	*ctx = groupContext{}
-
-	ok := s.ReadUint16((*uint16)(&ctx.version)) &&
-		s.ReadUint16((*uint16)(&ctx.cipherSuite)) &&
-		readOpaqueVec(s, (*[]byte)(&ctx.groupID)) &&
-		s.ReadUint64(&ctx.epoch) &&
-		readOpaqueVec(s, &ctx.treeHash) &&
-		readOpaqueVec(s, &ctx.confirmedTranscriptHash)
-	if !ok {
-		return io.ErrUnexpectedEOF
-	}
-
-	exts, err := unmarshalExtensionVec(s)
-	if err != nil {
-		return err
-	}
-	ctx.extensions = exts
 
 	return nil
 }
