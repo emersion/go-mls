@@ -150,3 +150,13 @@ func marshal(v marshaler) ([]byte, error) {
 	v.marshal(&b)
 	return b.Bytes()
 }
+
+type marshalerTBS interface {
+	marshalTBS(*cryptobyte.Builder)
+}
+
+func marshalTBS(v marshalerTBS) ([]byte, error) {
+	var b cryptobyte.Builder
+	v.marshalTBS(&b)
+	return b.Bytes()
+}

@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+
+	"golang.org/x/crypto/cryptobyte"
 )
 
 type testBytes []byte
@@ -16,6 +18,11 @@ func (out *testBytes) UnmarshalText(text []byte) error {
 	*out = make([]byte, hex.DecodedLen(len(text)))
 	_, err := hex.Decode(*out, text)
 	return err
+}
+
+func (tb testBytes) ByteString() *cryptobyte.String {
+	s := cryptobyte.String(tb)
+	return &s
 }
 
 func loadTestVector(t *testing.T, filename string, v interface{}) {

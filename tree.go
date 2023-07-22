@@ -278,19 +278,6 @@ func (node *leafNode) marshal(b *cryptobyte.Builder) {
 	writeOpaqueVec(b, []byte(node.signature))
 }
 
-type hpkeCiphertext struct {
-	kemOutput  []byte
-	ciphertext []byte
-}
-
-func (hpke *hpkeCiphertext) unmarshal(s *cryptobyte.String) error {
-	*hpke = hpkeCiphertext{}
-	if !readOpaqueVec(s, &hpke.kemOutput) || !readOpaqueVec(s, &hpke.ciphertext) {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-
 type updatePathNode struct {
 	encryptionKey       hpkePublicKey
 	encryptedPathSecret []hpkeCiphertext

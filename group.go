@@ -274,11 +274,15 @@ func (info *groupInfo) unmarshal(s *cryptobyte.String) error {
 	return nil
 }
 
-func (info *groupInfo) marshal(b *cryptobyte.Builder) {
+func (info *groupInfo) marshalTBS(b *cryptobyte.Builder) {
 	info.groupContext.marshal(b)
 	marshalExtensionVec(b, info.extensions)
 	writeOpaqueVec(b, info.confirmationTag)
 	b.AddUint32(info.signer)
+}
+
+func (info *groupInfo) marshal(b *cryptobyte.Builder) {
+	info.marshalTBS(b)
 	writeOpaqueVec(b, info.signature)
 }
 
@@ -340,6 +344,82 @@ func (w *welcome) unmarshal(s *cryptobyte.String) error {
 	if !readOpaqueVec(s, &w.encryptedGroupInfo) {
 		return io.ErrUnexpectedEOF
 	}
+
+	return nil
+}
+
+func (w *welcome) findSecret(ref keyPackageRef) *encryptedGroupSecrets {
+	for i, sec := range w.secrets {
+		if sec.newMember.Equal(ref) {
+			return &w.secrets[i]
+		}
+	}
+	return nil
+}
+
+func (w *welcome) process(ref keyPackageRef, initKeyPriv, signerPub []byte) error {
+	cs := w.cipherSuite
+
+	sec := w.findSecret(ref)
+	if sec == nil {
+		return fmt.Errorf("mls: encrypted group secrets not found for provided key package ref")
+	}
+
+	rawGroupSecrets, err := cs.decryptWithLabel(initKeyPriv, []byte("Welcome"), w.encryptedGroupInfo, sec.encryptedGroupSecrets.kemOutput, sec.encryptedGroupSecrets.ciphertext)
+	if err != nil {
+		return err
+	}
+	var groupSecrets groupSecrets
+	if err := unmarshal(rawGroupSecrets, &groupSecrets); err != nil {
+		return err
+	}
+
+	if len(groupSecrets.psks) > 0 {
+		return fmt.Errorf("TODO: welcome.process with psks")
+	}
+
+	_, kdf, aead := cs.hpke().Params()
+	kdfSecret := make([]byte, kdf.ExtractSize())
+	kdfSalt := groupSecrets.joinerSecret
+	extractedJoinerSecret := kdf.Extract(kdfSecret, kdfSalt)
+
+	welcomeSecret, err := cs.deriveSecret(extractedJoinerSecret, []byte("welcome"))
+	if err != nil {
+		return err
+	}
+
+	welcomeNonce, err := cs.expandWithLabel(welcomeSecret, []byte("nonce"), nil, uint16(aead.NonceSize()))
+	if err != nil {
+		return err
+	}
+	welcomeKey, err := cs.expandWithLabel(welcomeSecret, []byte("key"), nil, uint16(aead.KeySize()))
+	if err != nil {
+		return err
+	}
+
+	welcomeCipher, err := aead.New(welcomeKey)
+	if err != nil {
+		return err
+	}
+	rawGroupInfo, err := welcomeCipher.Open(nil, welcomeNonce, w.encryptedGroupInfo, nil)
+	if err != nil {
+		return err
+	}
+
+	var groupInfo groupInfo
+	if err := unmarshal(rawGroupInfo, &groupInfo); err != nil {
+		return err
+	}
+
+	groupInfoTBS, err := marshalTBS(&groupInfo)
+	if err != nil {
+		return err
+	}
+	if !cs.verifyWithLabel(signerPub, []byte("GroupInfoTBS"), groupInfoTBS, groupInfo.signature) {
+		return fmt.Errorf("mls: group info signature verification failed")
+	}
+
+	// TODO: verify confirmation tag in group info
 
 	return nil
 }
