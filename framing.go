@@ -152,11 +152,11 @@ func (content *framedContent) unmarshal(s *cryptobyte.String) error {
 type mlsMessage struct {
 	version        protocolVersion
 	wireFormat     wireFormat
-	publicMessage  *publicMessage
-	privateMessage *privateMessage
-	welcome        *welcome
-	groupInfo      *groupInfo
-	keyPackage     *keyPackage
+	publicMessage  *publicMessage  // for wireFormatMLSPublicMessage
+	privateMessage *privateMessage // for wireFormatMLSPrivateMessage
+	welcome        *welcome        // for wireFormatMLSWelcome
+	groupInfo      *groupInfo      // for wireFormatMLSGroupInfo
+	keyPackage     *keyPackage     // for wireFormatMLSKeyPackage
 }
 
 func (msg *mlsMessage) unmarshal(s *cryptobyte.String) error {
