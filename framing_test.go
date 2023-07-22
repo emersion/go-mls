@@ -22,8 +22,7 @@ func testMessages(t *testing.T, tc map[string]testBytes) {
 		{"mls_group_info", new(mlsMessage)},
 		{"mls_key_package", new(mlsMessage)},
 
-		// TODO
-		//{"ratchet_tree", nil},
+		{"ratchet_tree", new(ratchetTree)},
 		{"group_secrets", new(groupSecrets)},
 
 		{"add_proposal", new(add)},

@@ -7,6 +7,27 @@ import (
 	"golang.org/x/crypto/cryptobyte"
 )
 
+type parentNode struct {
+	encryptionKey  hpkePublicKey
+	parentHash     []byte
+	unmergedLeaves []uint32
+}
+
+func (node *parentNode) unmarshal(s *cryptobyte.String) error {
+	*node = parentNode{}
+	if !readOpaqueVec(s, (*[]byte)(&node.encryptionKey)) || !readOpaqueVec(s, &node.parentHash) {
+		return io.ErrUnexpectedEOF
+	}
+	return readVector(s, func(s *cryptobyte.String) error {
+		var i uint32
+		if !s.ReadUint32(&i) {
+			return io.ErrUnexpectedEOF
+		}
+		node.unmergedLeaves = append(node.unmergedLeaves, i)
+		return nil
+	})
+}
+
 type leafNodeSource uint8
 
 const (
@@ -255,6 +276,70 @@ func (up *updatePath) unmarshal(s *cryptobyte.String) error {
 			return err
 		}
 		up.nodes = append(up.nodes, node)
+		return nil
+	})
+}
+
+type nodeType uint8
+
+const (
+	nodeTypeLeaf   nodeType = 1
+	nodeTypeParent nodeType = 2
+)
+
+func (t *nodeType) unmarshal(s *cryptobyte.String) error {
+	if !s.ReadUint8((*uint8)(t)) {
+		return io.ErrUnexpectedEOF
+	}
+	switch *t {
+	case nodeTypeLeaf, nodeTypeParent:
+		return nil
+	default:
+		return fmt.Errorf("mls: invalid node type %d", *t)
+	}
+}
+
+type node struct {
+	nodeType   nodeType
+	leafNode   *leafNode   // for nodeTypeLeaf
+	parentNode *parentNode // for nodeTypeParent
+}
+
+func (n *node) unmarshal(s *cryptobyte.String) error {
+	*n = node{}
+
+	if err := n.nodeType.unmarshal(s); err != nil {
+		return err
+	}
+
+	switch n.nodeType {
+	case nodeTypeLeaf:
+		n.leafNode = new(leafNode)
+		return n.leafNode.unmarshal(s)
+	case nodeTypeParent:
+		n.parentNode = new(parentNode)
+		return n.parentNode.unmarshal(s)
+	default:
+		panic("unreachable")
+	}
+}
+
+type ratchetTree []*node
+
+func (tree *ratchetTree) unmarshal(s *cryptobyte.String) error {
+	*tree = ratchetTree{}
+	return readVector(s, func(s *cryptobyte.String) error {
+		var n *node
+		var hasNode bool
+		if !readOptional(s, &hasNode) {
+			return io.ErrUnexpectedEOF
+		} else if hasNode {
+			n = new(node)
+			if err := n.unmarshal(s); err != nil {
+				return err
+			}
+		}
+		*tree = append(*tree, n)
 		return nil
 	})
 }
