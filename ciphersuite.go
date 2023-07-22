@@ -117,9 +117,9 @@ var cipherSuiteDescriptions = map[cipherSuite]cipherSuiteDescription{
 }
 
 func (cs cipherSuite) refHash(label, value []byte) ([]byte, error) {
-	b := cryptobyte.NewBuilder(nil)
-	writeOpaqueVec(b, label)
-	writeOpaqueVec(b, value)
+	var b cryptobyte.Builder
+	writeOpaqueVec(&b, label)
+	writeOpaqueVec(&b, value)
 	in, err := b.Bytes()
 	if err != nil {
 		return nil, err
@@ -133,10 +133,10 @@ func (cs cipherSuite) refHash(label, value []byte) ([]byte, error) {
 func (cs cipherSuite) expandWithLabel(secret, label, context []byte, length uint16) ([]byte, error) {
 	label = append([]byte("MLS 1.0 "), label...)
 
-	b := cryptobyte.NewBuilder(nil)
+	var b cryptobyte.Builder
 	b.AddUint16(length)
-	writeOpaqueVec(b, label)
-	writeOpaqueVec(b, context)
+	writeOpaqueVec(&b, label)
+	writeOpaqueVec(&b, context)
 	kdfLabel, err := b.Bytes()
 	if err != nil {
 		return nil, err
@@ -152,7 +152,7 @@ func (cs cipherSuite) deriveSecret(secret, label []byte) ([]byte, error) {
 }
 
 func (cs cipherSuite) deriveTreeSecret(secret, label []byte, generation uint32, length uint16) ([]byte, error) {
-	b := cryptobyte.NewBuilder(nil)
+	var b cryptobyte.Builder
 	b.AddUint32(generation)
 	return cs.expandWithLabel(secret, label, b.BytesOrPanic(), length)
 }
@@ -231,18 +231,18 @@ func (cs cipherSuite) decryptWithLabel(privateKey, label, context, kemOutput, ci
 func marshalSignContent(label, content []byte) ([]byte, error) {
 	label = append([]byte("MLS 1.0 "), label...)
 
-	b := cryptobyte.NewBuilder(nil)
-	writeOpaqueVec(b, label)
-	writeOpaqueVec(b, content)
+	var b cryptobyte.Builder
+	writeOpaqueVec(&b, label)
+	writeOpaqueVec(&b, content)
 	return b.Bytes()
 }
 
 func marshalEncryptContext(label, context []byte) ([]byte, error) {
 	label = append([]byte("MLS 1.0 "), label...)
 
-	b := cryptobyte.NewBuilder(nil)
-	writeOpaqueVec(b, label)
-	writeOpaqueVec(b, context)
+	var b cryptobyte.Builder
+	writeOpaqueVec(&b, label)
+	writeOpaqueVec(&b, context)
 	return b.Bytes()
 }
 
