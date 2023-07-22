@@ -69,7 +69,12 @@ func (a *add) unmarshal(s *cryptobyte.String) error {
 }
 
 type update struct {
-	// TODO
+	leafNode leafNode
+}
+
+func (upd *update) unmarshal(s *cryptobyte.String) error {
+	*upd = update{}
+	return upd.leafNode.unmarshal(s)
 }
 
 type remove struct {

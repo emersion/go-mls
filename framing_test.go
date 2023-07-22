@@ -27,7 +27,7 @@ func testMessages(t *testing.T, tc map[string]testBytes) {
 		//{"group_secrets", new(groupSecrets)},
 
 		{"add_proposal", new(add)},
-		//{"update_proposal", new(update)},
+		{"update_proposal", new(update)},
 		//{"remove_proposal", new(remove)},
 		//{"pre_shared_key_proposal", new(preSharedKey)},
 		//{"re_init_proposal", new(reInit)},
