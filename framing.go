@@ -198,6 +198,8 @@ func (msg *mlsMessage) marshal(b *cryptobyte.Builder) {
 	b.AddUint16(uint16(msg.version))
 	b.AddUint16(uint16(msg.wireFormat))
 	switch msg.wireFormat {
+	case wireFormatMLSGroupInfo:
+		msg.groupInfo.marshal(b)
 	case wireFormatMLSKeyPackage:
 		msg.keyPackage.marshal(b)
 	default:

@@ -274,6 +274,14 @@ func (info *groupInfo) unmarshal(s *cryptobyte.String) error {
 	return nil
 }
 
+func (info *groupInfo) marshal(b *cryptobyte.Builder) {
+	info.groupContext.marshal(b)
+	marshalExtensionVec(b, info.extensions)
+	writeOpaqueVec(b, info.confirmationTag)
+	b.AddUint32(info.signer)
+	writeOpaqueVec(b, info.signature)
+}
+
 type groupSecrets struct {
 	joinerSecret []byte
 	pathSecret   []byte // optional

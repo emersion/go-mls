@@ -43,6 +43,16 @@ func (ctx *groupContext) unmarshal(s *cryptobyte.String) error {
 	return nil
 }
 
+func (ctx *groupContext) marshal(b *cryptobyte.Builder) {
+	b.AddUint16(uint16(ctx.version))
+	b.AddUint16(uint16(ctx.cipherSuite))
+	writeOpaqueVec(b, []byte(ctx.groupID))
+	b.AddUint64(ctx.epoch)
+	writeOpaqueVec(b, ctx.treeHash)
+	writeOpaqueVec(b, ctx.confirmedTranscriptHash)
+	marshalExtensionVec(b, ctx.extensions)
+}
+
 type pskType uint8
 
 const (
