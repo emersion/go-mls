@@ -40,7 +40,7 @@ func testMessages(t *testing.T, tc *messagesTest) {
 		{"mls_group_info", []byte(tc.MLSGroupInfo)},
 		{"mls_key_package", []byte(tc.MLSKeyPackage)},
 		{"public_message_application", []byte(tc.PublicMessageApplication)},
-		//{"public_message_proposal", []byte(tc.PublicMessageProposal)},
+		{"public_message_proposal", []byte(tc.PublicMessageProposal)},
 		//{"public_message_commit", []byte(tc.PublicMessageCommit)},
 		{"private_message", []byte(tc.PrivateMessage)},
 	}

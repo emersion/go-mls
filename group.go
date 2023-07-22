@@ -20,6 +20,18 @@ const (
 	proposalTypeGroupContextExtensions proposalType = 0x0007
 )
 
+func (t *proposalType) unmarshal(s *cryptobyte.String) error {
+	if !s.ReadUint16((*uint16)(t)) {
+		return io.ErrUnexpectedEOF
+	}
+	switch *t {
+	case proposalTypeAdd, proposalTypeUpdate, proposalTypeRemove, proposalTypePSK, proposalTypeReinit, proposalTypeExternalInit, proposalTypeGroupContextExtensions:
+		return nil
+	default:
+		return fmt.Errorf("mls: invalid proposal type %d", *t)
+	}
+}
+
 type proposal struct {
 	proposalType           proposalType
 	add                    *add
@@ -31,8 +43,29 @@ type proposal struct {
 	groupContextExtensions *groupContextExtensions
 }
 
+func (prop *proposal) unmarshal(s *cryptobyte.String) error {
+	*prop = proposal{}
+	if err := prop.proposalType.unmarshal(s); err != nil {
+		return err
+	}
+	switch prop.proposalType {
+	case proposalTypeAdd:
+		prop.add = new(add)
+		return prop.add.unmarshal(s)
+	case proposalTypeUpdate, proposalTypeRemove, proposalTypePSK, proposalTypeReinit, proposalTypeExternalInit, proposalTypeGroupContextExtensions:
+		return fmt.Errorf("TODO: proposal.unmarshal(%v)", prop.proposalType)
+	default:
+		panic("unreachable")
+	}
+}
+
 type add struct {
-	keyPackage *keyPackage
+	keyPackage keyPackage
+}
+
+func (a *add) unmarshal(s *cryptobyte.String) error {
+	*a = add{}
+	return a.keyPackage.unmarshal(s)
 }
 
 type update struct {

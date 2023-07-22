@@ -138,7 +138,10 @@ func (content *framedContent) unmarshal(s *cryptobyte.String) error {
 			return io.ErrUnexpectedEOF
 		}
 	case contentTypeProposal:
-		return fmt.Errorf("TODO: framedContent.unmarshal")
+		content.proposal = new(proposal)
+		if err := content.proposal.unmarshal(s); err != nil {
+			return err
+		}
 	case contentTypeCommit:
 		return fmt.Errorf("TODO: framedContent.unmarshal")
 	}
