@@ -179,7 +179,7 @@ func (content *framedContent) marshal(b *cryptobyte.Builder) {
 	case contentTypeProposal:
 		content.proposal.marshal(b)
 	case contentTypeCommit:
-		b.SetError(fmt.Errorf("TODO: framedContent.marshal"))
+		content.commit.marshal(b)
 	default:
 		panic("unreachable")
 	}

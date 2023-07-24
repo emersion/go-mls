@@ -116,6 +116,8 @@ func testMessageProtectionWireFormat(t *testing.T, tc *messageProtectionTest, ct
 		raw = pubMsg.content.applicationData
 	case contentTypeProposal:
 		raw, err = marshal(pubMsg.content.proposal)
+	case contentTypeCommit:
+		raw, err = marshal(pubMsg.content.commit)
 	default:
 		t.Errorf("unexpected content type %v", pubMsg.content.contentType)
 	}
@@ -141,8 +143,8 @@ func testMessageProtection(t *testing.T, tc *messageProtectionTest) {
 		raw, pub, priv testBytes
 	}{
 		{"proposal", tc.Proposal, tc.ProposalPub, tc.ProposalPriv},
-		//{"commit", tc.Commit, tc.CommitPub, tc.CommitPriv},
-		//{"application", tc.Application, nil, tc.ApplicationPriv},
+		{"commit", tc.Commit, tc.CommitPub, tc.CommitPriv},
+		{"application", tc.Application, nil, tc.ApplicationPriv},
 	}
 	for _, wireFormat := range wireFormats {
 		t.Run(wireFormat.name, func(t *testing.T) {

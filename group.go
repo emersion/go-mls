@@ -84,6 +84,8 @@ func (prop *proposal) marshal(b *cryptobyte.Builder) {
 	switch prop.proposalType {
 	case proposalTypeRemove:
 		prop.remove.marshal(b)
+	case proposalTypePSK:
+		prop.preSharedKey.marshal(b)
 	default:
 		b.SetError(fmt.Errorf("TODO: proposal.marshal"))
 	}
@@ -130,6 +132,10 @@ type preSharedKey struct {
 func (psk *preSharedKey) unmarshal(s *cryptobyte.String) error {
 	*psk = preSharedKey{}
 	return psk.psk.unmarshal(s)
+}
+
+func (psk *preSharedKey) marshal(b *cryptobyte.Builder) {
+	psk.psk.marshal(b)
 }
 
 type reInit struct {
@@ -202,6 +208,10 @@ func (t *proposalOrRefType) unmarshal(s *cryptobyte.String) error {
 	}
 }
 
+func (t proposalOrRefType) marshal(b *cryptobyte.Builder) {
+	b.AddUint8(uint8(t))
+}
+
 type proposalRef []byte
 
 type proposalOrRef struct {
@@ -226,6 +236,18 @@ func (propOrRef *proposalOrRef) unmarshal(s *cryptobyte.String) error {
 			return io.ErrUnexpectedEOF
 		}
 		return nil
+	default:
+		panic("unreachable")
+	}
+}
+
+func (propOrRef *proposalOrRef) marshal(b *cryptobyte.Builder) {
+	propOrRef.typ.marshal(b)
+	switch propOrRef.typ {
+	case proposalOrRefTypeProposal:
+		propOrRef.proposal.marshal(b)
+	case proposalOrRefTypeReference:
+		writeOpaqueVec(b, []byte(propOrRef.reference))
 	default:
 		panic("unreachable")
 	}
@@ -262,6 +284,16 @@ func (c *commit) unmarshal(s *cryptobyte.String) error {
 	}
 
 	return nil
+}
+
+func (c *commit) marshal(b *cryptobyte.Builder) {
+	writeVector(b, len(c.proposals), func(b *cryptobyte.Builder, i int) {
+		c.proposals[i].marshal(b)
+	})
+	writeOptional(b, c.path != nil)
+	if c.path != nil {
+		b.SetError(fmt.Errorf("TODO: commit.marshal"))
+	}
 }
 
 type groupInfo struct {
