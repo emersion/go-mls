@@ -361,3 +361,24 @@ type senderData struct {
 	generation uint32
 	reuseGuard [4]byte
 }
+
+func expandSenderDataKey(cs cipherSuite, senderDataSecret, ciphertext []byte) ([]byte, error) {
+	_, _, aead := cs.hpke().Params()
+	ciphertextSample := sampleCiphertext(cs, ciphertext)
+	return cs.expandWithLabel(senderDataSecret, []byte("key"), ciphertextSample, uint16(aead.KeySize()))
+}
+
+func expandSenderDataNonce(cs cipherSuite, senderDataSecret, ciphertext []byte) ([]byte, error) {
+	_, _, aead := cs.hpke().Params()
+	ciphertextSample := sampleCiphertext(cs, ciphertext)
+	return cs.expandWithLabel(senderDataSecret, []byte("nonce"), ciphertextSample, uint16(aead.NonceSize()))
+}
+
+func sampleCiphertext(cs cipherSuite, ciphertext []byte) []byte {
+	_, kdf, _ := cs.hpke().Params()
+	n := kdf.ExtractSize()
+	if len(ciphertext) < n {
+		return ciphertext
+	}
+	return ciphertext[:n]
+}
