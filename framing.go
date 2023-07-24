@@ -271,6 +271,7 @@ func (authData *framedContentAuthData) unmarshal(s *cryptobyte.String, ct conten
 }
 
 func (authData *framedContentAuthData) verify(cs cipherSuite, verifKey []byte, content *framedContentTBS) bool {
+	// TODO: check confirmationTag
 	rawContent, err := marshal(content)
 	if err != nil {
 		return false
@@ -319,6 +320,8 @@ func (msg *publicMessage) unmarshal(s *cryptobyte.String) error {
 
 	return nil
 }
+
+// TODO: add membershipTag verification
 
 type privateMessage struct {
 	groupID             GroupID
