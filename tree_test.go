@@ -43,7 +43,22 @@ func testTreeValidation(t *testing.T, tc *treeValidationTest) {
 		}
 	}
 
-	// TODO: check parent hashes, signatures
+	// TODO: check parent hashes
+
+	groupID := GroupID(tc.GroupID)
+	for i, node := range tree {
+		if node == nil || node.nodeType != nodeTypeLeaf {
+			continue
+		}
+		li, ok := nodeIndex(i).leafIndex()
+		if !ok {
+			t.Errorf("leafIndex(%v) = false", i)
+			continue
+		}
+		if !node.leafNode.verify(tc.CipherSuite, groupID, li) {
+			t.Errorf("verify(%v) = false", li)
+		}
+	}
 }
 
 func TestTreeValidation(t *testing.T) {

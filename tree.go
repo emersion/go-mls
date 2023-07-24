@@ -270,7 +270,7 @@ func (node *leafNode) unmarshal(s *cryptobyte.String) error {
 	return nil
 }
 
-func (node *leafNode) marshal(b *cryptobyte.Builder) {
+func (node *leafNode) marshalBase(b *cryptobyte.Builder) {
 	writeOpaqueVec(b, []byte(node.encryptionKey))
 	writeOpaqueVec(b, []byte(node.signatureKey))
 	node.credential.marshal(b)
@@ -283,7 +283,40 @@ func (node *leafNode) marshal(b *cryptobyte.Builder) {
 		writeOpaqueVec(b, node.parentHash)
 	}
 	marshalExtensionVec(b, node.extensions)
+}
+
+func (node *leafNode) marshal(b *cryptobyte.Builder) {
+	node.marshalBase(b)
 	writeOpaqueVec(b, []byte(node.signature))
+}
+
+type leafNodeTBS struct {
+	*leafNode
+
+	// for leafNodeSourceUpdate and leafNodeSourceCommit
+	groupID   GroupID
+	leafIndex leafIndex
+}
+
+func (node *leafNodeTBS) marshal(b *cryptobyte.Builder) {
+	node.leafNode.marshalBase(b)
+	switch node.leafNode.leafNodeSource {
+	case leafNodeSourceUpdate, leafNodeSourceCommit:
+		writeOpaqueVec(b, []byte(node.groupID))
+		b.AddUint32(uint32(node.leafIndex))
+	}
+}
+
+func (node *leafNode) verify(cs cipherSuite, groupID GroupID, li leafIndex) bool {
+	leafNodeTBS, err := marshal(&leafNodeTBS{
+		leafNode:  node,
+		groupID:   groupID,
+		leafIndex: li,
+	})
+	if err != nil {
+		return false
+	}
+	return cs.verifyWithLabel([]byte(node.signatureKey), []byte("LeafNodeTBS"), leafNodeTBS, node.signature)
 }
 
 type updatePathNode struct {
