@@ -33,6 +33,10 @@ func (ct *contentType) unmarshal(s *cryptobyte.String) error {
 	}
 }
 
+func (ct contentType) marshal(b *cryptobyte.Builder) {
+	b.AddUint8(uint8(ct))
+}
+
 type senderType uint8
 
 const (
@@ -52,6 +56,10 @@ func (st *senderType) unmarshal(s *cryptobyte.String) error {
 	default:
 		return fmt.Errorf("mls: invalid sender type %d", *st)
 	}
+}
+
+func (st senderType) marshal(b *cryptobyte.Builder) {
+	b.AddUint8(uint8(st))
 }
 
 type sender struct {
@@ -76,6 +84,16 @@ func (snd *sender) unmarshal(s *cryptobyte.String) error {
 		}
 	}
 	return nil
+}
+
+func (snd *sender) marshal(b *cryptobyte.Builder) {
+	snd.senderType.marshal(b)
+	switch snd.senderType {
+	case senderTypeMember:
+		b.AddUint32(uint32(snd.leafIndex))
+	case senderTypeExternal:
+		b.AddUint32(snd.senderIndex)
+	}
 }
 
 type wireFormat uint16
@@ -144,6 +162,24 @@ func (content *framedContent) unmarshal(s *cryptobyte.String) error {
 	case contentTypeCommit:
 		content.commit = new(commit)
 		return content.commit.unmarshal(s)
+	default:
+		panic("unreachable")
+	}
+}
+
+func (content *framedContent) marshal(b *cryptobyte.Builder) {
+	writeOpaqueVec(b, []byte(content.groupID))
+	b.AddUint64(content.epoch)
+	content.sender.marshal(b)
+	writeOpaqueVec(b, content.authenticatedData)
+	content.contentType.marshal(b)
+	switch content.contentType {
+	case contentTypeApplication:
+		writeOpaqueVec(b, content.applicationData)
+	case contentTypeProposal:
+		content.proposal.marshal(b)
+	case contentTypeCommit:
+		b.SetError(fmt.Errorf("TODO: framedContent.marshal"))
 	default:
 		panic("unreachable")
 	}
@@ -232,6 +268,31 @@ func (authData *framedContentAuthData) unmarshal(s *cryptobyte.String, ct conten
 	}
 
 	return nil
+}
+
+func (authData *framedContentAuthData) verify(cs cipherSuite, verifKey []byte, content *framedContentTBS) bool {
+	rawContent, err := marshal(content)
+	if err != nil {
+		return false
+	}
+	return cs.verifyWithLabel(verifKey, []byte("FramedContentTBS"), rawContent, authData.signature)
+}
+
+type framedContentTBS struct {
+	version    protocolVersion
+	wireFormat wireFormat
+	content    framedContent
+	context    *groupContext // for senderTypeMember and senderTypeNewMemberCommit
+}
+
+func (content *framedContentTBS) marshal(b *cryptobyte.Builder) {
+	b.AddUint16(uint16(content.version))
+	b.AddUint16(uint16(content.wireFormat))
+	content.content.marshal(b)
+	switch content.content.sender.senderType {
+	case senderTypeMember, senderTypeNewMemberCommit:
+		content.context.marshal(b)
+	}
 }
 
 type publicMessage struct {

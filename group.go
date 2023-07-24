@@ -32,6 +32,10 @@ func (t *proposalType) unmarshal(s *cryptobyte.String) error {
 	}
 }
 
+func (t proposalType) marshal(b *cryptobyte.Builder) {
+	b.AddUint16(uint16(t))
+}
+
 type proposal struct {
 	proposalType           proposalType
 	add                    *add                    // for proposalTypeAdd
@@ -75,6 +79,16 @@ func (prop *proposal) unmarshal(s *cryptobyte.String) error {
 	}
 }
 
+func (prop *proposal) marshal(b *cryptobyte.Builder) {
+	prop.proposalType.marshal(b)
+	switch prop.proposalType {
+	case proposalTypeRemove:
+		prop.remove.marshal(b)
+	default:
+		b.SetError(fmt.Errorf("TODO: proposal.marshal"))
+	}
+}
+
 type add struct {
 	keyPackage keyPackage
 }
@@ -103,6 +117,10 @@ func (rm *remove) unmarshal(s *cryptobyte.String) error {
 		return io.ErrUnexpectedEOF
 	}
 	return nil
+}
+
+func (rm *remove) marshal(b *cryptobyte.Builder) {
+	b.AddUint32(uint32(rm.removed))
 }
 
 type preSharedKey struct {
