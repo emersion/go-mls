@@ -72,6 +72,10 @@ func (t *pskType) unmarshal(s *cryptobyte.String) error {
 	}
 }
 
+func (t pskType) marshal(b *cryptobyte.Builder) {
+	b.AddUint8(uint8(t))
+}
+
 type resumptionPSKUsage uint8
 
 const (
@@ -90,6 +94,10 @@ func (usage *resumptionPSKUsage) unmarshal(s *cryptobyte.String) error {
 	default:
 		return fmt.Errorf("mls: invalid resumption PSK usage %d", *usage)
 	}
+}
+
+func (usage resumptionPSKUsage) marshal(b *cryptobyte.Builder) {
+	b.AddUint8(uint8(usage))
 }
 
 type preSharedKeyID struct {
@@ -134,4 +142,64 @@ func (id *preSharedKeyID) unmarshal(s *cryptobyte.String) error {
 	}
 
 	return nil
+}
+
+func (id *preSharedKeyID) marshal(b *cryptobyte.Builder) {
+	id.pskType.marshal(b)
+	switch id.pskType {
+	case pskTypeExternal:
+		writeOpaqueVec(b, id.pskID)
+	case pskTypeResumption:
+		id.usage.marshal(b)
+		writeOpaqueVec(b, []byte(id.pskGroupID))
+		b.AddUint64(id.pskEpoch)
+	default:
+		panic("unreachable")
+	}
+	writeOpaqueVec(b, id.pskNonce)
+}
+
+func extractPSKSecret(cs cipherSuite, pskIDs []preSharedKeyID, psks [][]byte) ([]byte, error) {
+	if len(pskIDs) != len(psks) {
+		return nil, fmt.Errorf("mls: got %v PSK IDs and %v PSKs, want same number", len(pskIDs), len(psks))
+	}
+
+	_, kdf, _ := cs.hpke().Params()
+	zero := make([]byte, kdf.ExtractSize())
+
+	pskSecret := zero
+	for i := range pskIDs {
+		pskExtracted := kdf.Extract(psks[i], zero)
+
+		pskLabel := pskLabel{
+			id:    pskIDs[i],
+			index: uint16(i),
+			count: uint16(len(pskIDs)),
+		}
+		rawPSKLabel, err := marshal(&pskLabel)
+		if err != nil {
+			return nil, err
+		}
+
+		pskInput, err := cs.expandWithLabel(pskExtracted, []byte("derived psk"), rawPSKLabel, uint16(kdf.ExtractSize()))
+		if err != nil {
+			return nil, err
+		}
+
+		pskSecret = kdf.Extract(pskSecret, pskInput)
+	}
+
+	return pskSecret, nil
+}
+
+type pskLabel struct {
+	id    preSharedKeyID
+	index uint16
+	count uint16
+}
+
+func (label *pskLabel) marshal(b *cryptobyte.Builder) {
+	label.id.marshal(b)
+	b.AddUint16(label.index)
+	b.AddUint16(label.count)
 }
