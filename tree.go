@@ -447,19 +447,11 @@ func (tree ratchetTree) index(i nodeIndex) *node {
 func (tree ratchetTree) resolve(x nodeIndex) []nodeIndex {
 	n := tree.index(x)
 	if n == nil {
-		if x.isLeaf() {
-			return nil
-		} else {
-			l, ok := x.left()
-			if !ok {
-				panic("unreachable")
-			}
-			r, ok := x.right()
-			if !ok {
-				panic("unreachable")
-			}
-			return append(tree.resolve(l), tree.resolve(r)...)
+		l, r, ok := x.children()
+		if !ok {
+			return nil // leaf
 		}
+		return append(tree.resolve(l), tree.resolve(r)...)
 	} else {
 		res := []nodeIndex{x}
 		if n.nodeType == nodeTypeParent {
@@ -486,11 +478,7 @@ func (tree ratchetTree) hash(cs cipherSuite, x nodeIndex) ([]byte, error) {
 
 		marshalLeafNodeHashInput(&b, li, l)
 	} else {
-		left, ok := x.left()
-		if !ok {
-			panic("unreachable")
-		}
-		right, ok := x.right()
+		left, right, ok := x.children()
 		if !ok {
 			panic("unreachable")
 		}

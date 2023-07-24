@@ -131,6 +131,17 @@ func (x nodeIndex) right() (nodeIndex, bool) {
 	return r, true
 }
 
+// children returns the indices of the left and right children for an
+// intermediate node index.
+func (x nodeIndex) children() (left, right nodeIndex, ok bool) {
+	l, ok := x.left()
+	if !ok {
+		return 0, 0, false
+	}
+	r, _ := x.right()
+	return l, r, true
+}
+
 // level returns the level of a node in the tree. Leaves are at level 0, their
 // parents are at level 1, etc.
 func (x nodeIndex) level() uint32 {
