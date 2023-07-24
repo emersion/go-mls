@@ -1,6 +1,7 @@
 package mls
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"testing"
@@ -33,7 +34,16 @@ func testTreeValidation(t *testing.T, tc *treeValidationTest) {
 		}
 	}
 
-	// TODO: check tree hashes, parent hashes, signatures
+	for i, want := range tc.TreeHashes {
+		x := nodeIndex(i)
+		if h, err := tree.hash(tc.CipherSuite, x); err != nil {
+			t.Errorf("hash(%v) = %v", x, err)
+		} else if !bytes.Equal(h, []byte(want)) {
+			t.Errorf("hash(%v) = %v, want %v", x, h, want)
+		}
+	}
+
+	// TODO: check parent hashes, signatures
 }
 
 func TestTreeValidation(t *testing.T) {

@@ -103,6 +103,14 @@ func (x nodeIndex) isLeaf() bool {
 	return x%2 == 0
 }
 
+// leafIndex returns the index of the leaf from a node index.
+func (x nodeIndex) leafIndex() (leafIndex, bool) {
+	if !x.isLeaf() {
+		return 0, false
+	}
+	return leafIndex(x) >> 1, true
+}
+
 // left returns the index of the left child for an intermediate node index.
 func (x nodeIndex) left() (nodeIndex, bool) {
 	lvl := x.level()

@@ -28,6 +28,14 @@ func (node *parentNode) unmarshal(s *cryptobyte.String) error {
 	})
 }
 
+func (node *parentNode) marshal(b *cryptobyte.Builder) {
+	writeOpaqueVec(b, []byte(node.encryptionKey))
+	writeOpaqueVec(b, node.parentHash)
+	writeVector(b, len(node.unmergedLeaves), func(b *cryptobyte.Builder, i int) {
+		b.AddUint32(uint32(node.unmergedLeaves[i]))
+	})
+}
+
 type leafNodeSource uint8
 
 const (
@@ -428,4 +436,76 @@ func (tree ratchetTree) resolve(x nodeIndex) []nodeIndex {
 		}
 		return res
 	}
+}
+
+func (tree ratchetTree) hash(cs cipherSuite, x nodeIndex) ([]byte, error) {
+	n := tree.index(x)
+
+	var b cryptobyte.Builder
+	if li, ok := x.leafIndex(); ok {
+		var l *leafNode
+		if n != nil {
+			l = n.leafNode
+			if l == nil {
+				panic("unreachable")
+			}
+		}
+
+		marshalLeafNodeHashInput(&b, li, l)
+	} else {
+		left, ok := x.left()
+		if !ok {
+			panic("unreachable")
+		}
+		right, ok := x.right()
+		if !ok {
+			panic("unreachable")
+		}
+
+		leftHash, err := tree.hash(cs, left)
+		if err != nil {
+			return nil, err
+		}
+		rightHash, err := tree.hash(cs, right)
+		if err != nil {
+			return nil, err
+		}
+
+		var p *parentNode
+		if n != nil {
+			p = n.parentNode
+			if p == nil {
+				panic("unreachable")
+			}
+		}
+
+		marshalParentNodeHashInput(&b, p, leftHash, rightHash)
+	}
+	in, err := b.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	h := cs.hash().New()
+	h.Write(in)
+	return h.Sum(nil), nil
+}
+
+func marshalLeafNodeHashInput(b *cryptobyte.Builder, i leafIndex, node *leafNode) {
+	b.AddUint8(uint8(nodeTypeLeaf))
+	b.AddUint32(uint32(i))
+	writeOptional(b, node != nil)
+	if node != nil {
+		node.marshal(b)
+	}
+}
+
+func marshalParentNodeHashInput(b *cryptobyte.Builder, node *parentNode, leftHash, rightHash []byte) {
+	b.AddUint8(uint8(nodeTypeParent))
+	writeOptional(b, node != nil)
+	if node != nil {
+		node.marshal(b)
+	}
+	writeOpaqueVec(b, leftHash)
+	writeOpaqueVec(b, rightHash)
 }

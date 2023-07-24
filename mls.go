@@ -126,6 +126,14 @@ func readOptional(s *cryptobyte.String, present *bool) bool {
 	return true
 }
 
+func writeOptional(b *cryptobyte.Builder, present bool) {
+	u8 := uint8(0)
+	if present {
+		u8 = 1
+	}
+	b.AddUint8(u8)
+}
+
 type unmarshaler interface {
 	unmarshal(*cryptobyte.String) error
 }
