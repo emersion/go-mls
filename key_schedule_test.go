@@ -116,11 +116,16 @@ func testKeySchedule(t *testing.T, tc *keyScheduleTest) {
 			t.Errorf("extractJoinerSecret() = %v, want %v", joinerSecret, epoch.JoinerSecret)
 		}
 
-		welcomeSecret, epochSecret, err := ctx.extractWelcomeAndEpochSecret(joinerSecret, []byte(epoch.PSKSecret))
+		welcomeSecret, err := extractWelcomeSecret(ctx.cipherSuite, joinerSecret, []byte(epoch.PSKSecret))
 		if err != nil {
-			t.Errorf("extractWelcomeAndEpochSecret() = %v", err)
+			t.Errorf("extractWelcomeSecret() = %v", err)
 		} else if !bytes.Equal(welcomeSecret, []byte(epoch.WelcomeSecret)) {
-			t.Errorf("extractWelcomeAndEpochSecret(): welcomeSecret = %v, want %v", welcomeSecret, epoch.WelcomeSecret)
+			t.Errorf("extractWelcomeSecret() = %v, want %v", welcomeSecret, epoch.WelcomeSecret)
+		}
+
+		epochSecret, err := ctx.extractEpochSecret(joinerSecret, []byte(epoch.PSKSecret))
+		if err != nil {
+			t.Fatalf("extractEpochSecret() = %v", err)
 		}
 
 		initSecret, err = ctx.cipherSuite.deriveSecret(epochSecret, secretLabelInit)

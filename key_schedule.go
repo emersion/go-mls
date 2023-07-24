@@ -66,8 +66,24 @@ func (ctx *groupContext) extractJoinerSecret(prevInitSecret, commitSecret []byte
 	return cs.expandWithLabel(extracted, []byte("joiner"), rawGroupContext, uint16(kdf.ExtractSize()))
 }
 
-func (ctx *groupContext) extractWelcomeAndEpochSecret(joinerSecret, pskSecret []byte) (welcomeSecret, epochSecret []byte, err error) {
+func (ctx *groupContext) extractEpochSecret(joinerSecret, pskSecret []byte) ([]byte, error) {
 	cs := ctx.cipherSuite
+	_, kdf, _ := cs.hpke().Params()
+
+	// TODO de-duplicate with extractWelcomeSecret
+	if pskSecret == nil {
+		pskSecret = make([]byte, kdf.ExtractSize())
+	}
+	extracted := kdf.Extract(pskSecret, joinerSecret)
+
+	rawGroupContext, err := marshal(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return cs.expandWithLabel(extracted, []byte("epoch"), rawGroupContext, uint16(kdf.ExtractSize()))
+}
+
+func extractWelcomeSecret(cs cipherSuite, joinerSecret, pskSecret []byte) ([]byte, error) {
 	_, kdf, _ := cs.hpke().Params()
 
 	if pskSecret == nil {
@@ -75,21 +91,7 @@ func (ctx *groupContext) extractWelcomeAndEpochSecret(joinerSecret, pskSecret []
 	}
 	extracted := kdf.Extract(pskSecret, joinerSecret)
 
-	welcomeSecret, err = cs.deriveSecret(extracted, []byte("welcome"))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	rawGroupContext, err := marshal(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	epochSecret, err = cs.expandWithLabel(extracted, []byte("epoch"), rawGroupContext, uint16(kdf.ExtractSize()))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return welcomeSecret, epochSecret, nil
+	return cs.deriveSecret(extracted, []byte("welcome"))
 }
 
 var (

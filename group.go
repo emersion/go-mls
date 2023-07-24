@@ -411,6 +411,7 @@ func (w *welcome) findSecret(ref keyPackageRef) *encryptedGroupSecrets {
 
 func (w *welcome) process(ref keyPackageRef, initKeyPriv []byte, signerPub signaturePublicKey) error {
 	cs := w.cipherSuite
+	_, _, aead := cs.hpke().Params()
 
 	sec := w.findSecret(ref)
 	if sec == nil {
@@ -430,13 +431,7 @@ func (w *welcome) process(ref keyPackageRef, initKeyPriv []byte, signerPub signa
 		return fmt.Errorf("TODO: welcome.process with psks")
 	}
 
-	// TODO: de-duplicate with extractWelcomeAndEpochSecret
-	_, kdf, aead := cs.hpke().Params()
-	kdfSecret := make([]byte, kdf.ExtractSize())
-	kdfSalt := groupSecrets.joinerSecret
-	extractedJoinerSecret := kdf.Extract(kdfSecret, kdfSalt)
-
-	welcomeSecret, err := cs.deriveSecret(extractedJoinerSecret, []byte("welcome"))
+	welcomeSecret, err := extractWelcomeSecret(cs, groupSecrets.joinerSecret, nil)
 	if err != nil {
 		return err
 	}
