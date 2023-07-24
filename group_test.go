@@ -37,7 +37,7 @@ func testWelcome(t *testing.T, tc *welcomeTest) {
 		t.Fatalf("keyPackage.generateRef() = %v", err)
 	}
 
-	if err := welcome.process(keyPackageRef, []byte(tc.InitPriv), []byte(tc.SignerPub)); err != nil {
+	if err := welcome.process(keyPackageRef, []byte(tc.InitPriv), signaturePublicKey(tc.SignerPub)); err != nil {
 		t.Fatalf("welcome.process() = %v", err)
 	}
 }

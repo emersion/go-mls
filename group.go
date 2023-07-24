@@ -357,7 +357,7 @@ func (w *welcome) findSecret(ref keyPackageRef) *encryptedGroupSecrets {
 	return nil
 }
 
-func (w *welcome) process(ref keyPackageRef, initKeyPriv, signerPub []byte) error {
+func (w *welcome) process(ref keyPackageRef, initKeyPriv []byte, signerPub signaturePublicKey) error {
 	cs := w.cipherSuite
 
 	sec := w.findSecret(ref)
@@ -415,7 +415,7 @@ func (w *welcome) process(ref keyPackageRef, initKeyPriv, signerPub []byte) erro
 	if err != nil {
 		return err
 	}
-	if !cs.verifyWithLabel(signerPub, []byte("GroupInfoTBS"), groupInfoTBS, groupInfo.signature) {
+	if !cs.verifyWithLabel([]byte(signerPub), []byte("GroupInfoTBS"), groupInfoTBS, groupInfo.signature) {
 		return fmt.Errorf("mls: group info signature verification failed")
 	}
 
