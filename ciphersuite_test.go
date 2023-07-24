@@ -75,7 +75,7 @@ type deriveTreeSecretTest struct {
 }
 
 func testDeriveTreeSecret(t *testing.T, cs cipherSuite, tc *deriveTreeSecretTest) {
-	out, err := cs.deriveTreeSecret([]byte(tc.Secret), []byte(tc.Label), tc.Generation, tc.Length)
+	out, err := deriveTreeSecret(cs, []byte(tc.Secret), []byte(tc.Label), tc.Generation, tc.Length)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -151,12 +151,6 @@ func (cs cipherSuite) deriveSecret(secret, label []byte) ([]byte, error) {
 	return cs.expandWithLabel(secret, label, nil, uint16(kdf.ExtractSize()))
 }
 
-func (cs cipherSuite) deriveTreeSecret(secret, label []byte, generation uint32, length uint16) ([]byte, error) {
-	var b cryptobyte.Builder
-	b.AddUint32(generation)
-	return cs.expandWithLabel(secret, label, b.BytesOrPanic(), length)
-}
-
 func (cs cipherSuite) signWithLabel(signKey, label, content []byte) ([]byte, error) {
 	signContent, err := marshalSignContent(label, content)
 	if err != nil {
