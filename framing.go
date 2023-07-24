@@ -348,6 +348,104 @@ func (msg *privateMessage) unmarshal(s *cryptobyte.String) error {
 	return nil
 }
 
+func (msg *privateMessage) decryptSenderData(cs cipherSuite, senderDataSecret []byte) (*senderData, error) {
+	key, err := expandSenderDataKey(cs, senderDataSecret, msg.ciphertext)
+	if err != nil {
+		return nil, err
+	}
+	nonce, err := expandSenderDataNonce(cs, senderDataSecret, msg.ciphertext)
+	if err != nil {
+		return nil, err
+	}
+
+	rawAAD, err := marshal((*senderDataAAD)(msg))
+	if err != nil {
+		return nil, err
+	}
+
+	_, _, aead := cs.hpke().Params()
+	cipher, err := aead.New(key)
+	if err != nil {
+		return nil, err
+	}
+
+	rawSenderData, err := cipher.Open(nil, nonce, msg.encryptedSenderData, rawAAD)
+	if err != nil {
+		return nil, err
+	}
+
+	var senderData senderData
+	if err := unmarshal(rawSenderData, &senderData); err != nil {
+		return nil, err
+	}
+
+	return &senderData, nil
+}
+
+func (msg *privateMessage) decryptContent(cs cipherSuite, secret ratchetSecret, reuseGuard [4]byte) (*privateMessageContent, error) {
+	key, err := secret.deriveKey(cs)
+	if err != nil {
+		return nil, err
+	}
+	nonce, err := secret.deriveNonce(cs)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range reuseGuard {
+		nonce[i] = nonce[i] ^ reuseGuard[i]
+	}
+
+	rawAAD, err := marshal((*privateContentAAD)(msg))
+	if err != nil {
+		return nil, err
+	}
+
+	_, _, aead := cs.hpke().Params()
+	cipher, err := aead.New(key)
+	if err != nil {
+		return nil, err
+	}
+
+	rawContent, err := cipher.Open(nil, nonce, msg.ciphertext, rawAAD)
+	if err != nil {
+		return nil, err
+	}
+
+	s := cryptobyte.String(rawContent)
+	var content privateMessageContent
+	if err := content.unmarshal(&s, msg.contentType); err != nil {
+		return nil, err
+	}
+
+	for _, v := range s {
+		if v != 0 {
+			return nil, fmt.Errorf("mls: padding contains non-zero bytes")
+		}
+	}
+
+	// TODO: check framedContentAuthData
+
+	return &content, nil
+}
+
+type senderDataAAD privateMessage
+
+func (aad *senderDataAAD) marshal(b *cryptobyte.Builder) {
+	writeOpaqueVec(b, []byte(aad.groupID))
+	b.AddUint64(aad.epoch)
+	aad.contentType.marshal(b)
+}
+
+type privateContentAAD privateMessage
+
+func (aad *privateContentAAD) marshal(b *cryptobyte.Builder) {
+	writeOpaqueVec(b, []byte(aad.groupID))
+	b.AddUint64(aad.epoch)
+	aad.contentType.marshal(b)
+	writeOpaqueVec(b, aad.authenticatedData)
+}
+
 type privateMessageContent struct {
 	applicationData []byte    // for contentTypeApplication
 	proposal        *proposal // for contentTypeProposal
@@ -356,10 +454,42 @@ type privateMessageContent struct {
 	auth framedContentAuthData
 }
 
+func (content *privateMessageContent) unmarshal(s *cryptobyte.String, ct contentType) error {
+	*content = privateMessageContent{}
+
+	var err error
+	switch ct {
+	case contentTypeApplication:
+		if !readOpaqueVec(s, &content.applicationData) {
+			err = io.ErrUnexpectedEOF
+		}
+	case contentTypeProposal:
+		content.proposal = new(proposal)
+		err = content.proposal.unmarshal(s)
+	case contentTypeCommit:
+		content.commit = new(commit)
+		err = content.commit.unmarshal(s)
+	default:
+		panic("unreachable")
+	}
+	if err != nil {
+		return err
+	}
+
+	return content.auth.unmarshal(s, ct)
+}
+
 type senderData struct {
 	leafIndex  leafIndex
 	generation uint32
 	reuseGuard [4]byte
+}
+
+func (data *senderData) unmarshal(s *cryptobyte.String) error {
+	if !s.ReadUint32((*uint32)(&data.leafIndex)) || !s.ReadUint32(&data.generation) || !s.CopyBytes(data.reuseGuard[:]) {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 
 func expandSenderDataKey(cs cipherSuite, senderDataSecret, ciphertext []byte) ([]byte, error) {

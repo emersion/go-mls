@@ -11,6 +11,17 @@ var (
 	ratchetLabelApplication = ratchetLabel("application")
 )
 
+func ratchetLabelFromContentType(ct contentType) ratchetLabel {
+	switch ct {
+	case contentTypeApplication:
+		return ratchetLabelApplication
+	case contentTypeProposal, contentTypeCommit:
+		return ratchetLabelHandshake
+	default:
+		panic("unreachable")
+	}
+}
+
 type secretTree [][]byte
 
 func deriveSecretTree(cs cipherSuite, n numLeaves, encryptionSecret []byte) (secretTree, error) {

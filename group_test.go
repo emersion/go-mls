@@ -81,18 +81,14 @@ type messageProtectionTest struct {
 	ApplicationPriv testBytes `json:"application_priv"`
 }
 
-func testMessageProtectionWireFormat(t *testing.T, tc *messageProtectionTest, ctx *groupContext, wantRaw, rawPub, rawPriv []byte) {
-	// TODO: check raw matches, roundtrip pub, rawPriv, roundtrip priv
-
-	if len(rawPub) == 0 {
-		return
-	}
+func testMessageProtectionPub(t *testing.T, tc *messageProtectionTest, ctx *groupContext, wantRaw, rawPub []byte) {
+	// TODO: test roundtrip
 
 	var msg mlsMessage
 	if err := unmarshal(rawPub, &msg); err != nil {
-		t.Fatalf("unmarshal(pub) = %v", err)
+		t.Fatalf("unmarshal() = %v", err)
 	} else if msg.wireFormat != wireFormatMLSPublicMessage {
-		t.Fatalf("unmarshal(pub): wireFormat = %v, want %v", msg.wireFormat, wireFormatMLSPublicMessage)
+		t.Fatalf("unmarshal(): wireFormat = %v, want %v", msg.wireFormat, wireFormatMLSPublicMessage)
 	}
 	pubMsg := msg.publicMessage
 
@@ -103,7 +99,7 @@ func testMessageProtectionWireFormat(t *testing.T, tc *messageProtectionTest, ct
 		context:    ctx,
 	}
 	if !pubMsg.auth.verify(tc.CipherSuite, []byte(tc.SignaturePub), &framedContentTBS) {
-		t.Errorf("verify(pub) failed")
+		t.Errorf("verify() failed")
 	}
 	// TODO: check membership tag
 
@@ -122,9 +118,66 @@ func testMessageProtectionWireFormat(t *testing.T, tc *messageProtectionTest, ct
 		t.Errorf("unexpected content type %v", pubMsg.content.contentType)
 	}
 	if err != nil {
-		t.Errorf("marshal(pub) = %v", err)
+		t.Errorf("marshal() = %v", err)
 	} else if !bytes.Equal(raw, wantRaw) {
-		t.Errorf("marshal(pub) = %v, want %v", raw, wantRaw)
+		t.Errorf("marshal() = %v, want %v", raw, wantRaw)
+	}
+}
+
+func testMessageProtectionPriv(t *testing.T, tc *messageProtectionTest, ctx *groupContext, wantRaw, rawPriv []byte) {
+	// TODO: test roundtrip
+
+	var msg mlsMessage
+	if err := unmarshal(rawPriv, &msg); err != nil {
+		t.Fatalf("unmarshal() = %v", err)
+	} else if msg.wireFormat != wireFormatMLSPrivateMessage {
+		t.Fatalf("unmarshal(): wireFormat = %v, want %v", msg.wireFormat, wireFormatMLSPrivateMessage)
+	}
+	privMsg := msg.privateMessage
+
+	senderData, err := privMsg.decryptSenderData(tc.CipherSuite, []byte(tc.SenderDataSecret))
+	if err != nil {
+		t.Fatalf("decryptSenderData() = %v", err)
+	}
+
+	tree, err := deriveSecretTree(tc.CipherSuite, numLeaves(2), []byte(tc.EncryptionSecret))
+	if err != nil {
+		t.Fatalf("deriveSecretTree() = %v", err)
+	}
+
+	label := ratchetLabelFromContentType(privMsg.contentType)
+	li := leafIndex(1)
+	secret, err := tree.deriveRatchetRoot(tc.CipherSuite, li.nodeIndex(), label)
+	if err != nil {
+		t.Fatalf("deriveRatchetRoot() = %v", err)
+	}
+	for secret.generation != senderData.generation {
+		secret, err = secret.deriveNext(tc.CipherSuite)
+		if err != nil {
+			t.Fatalf("deriveNext() = %v", err)
+		}
+	}
+
+	content, err := privMsg.decryptContent(tc.CipherSuite, secret, senderData.reuseGuard)
+	if err != nil {
+		t.Fatalf("decryptContent() = %v", err)
+	}
+
+	var raw []byte
+	switch privMsg.contentType {
+	case contentTypeApplication:
+		raw = content.applicationData
+	case contentTypeProposal:
+		raw, err = marshal(content.proposal)
+	case contentTypeCommit:
+		raw, err = marshal(content.commit)
+	default:
+		t.Errorf("unexpected content type %v", privMsg.contentType)
+	}
+	if err != nil {
+		t.Errorf("marshal() = %v", err)
+	} else if !bytes.Equal(raw, wantRaw) {
+		t.Errorf("marshal() = %v, want %v", raw, wantRaw)
 	}
 }
 
@@ -148,7 +201,17 @@ func testMessageProtection(t *testing.T, tc *messageProtectionTest) {
 	}
 	for _, wireFormat := range wireFormats {
 		t.Run(wireFormat.name, func(t *testing.T) {
-			testMessageProtectionWireFormat(t, tc, &ctx, []byte(wireFormat.raw), []byte(wireFormat.pub), []byte(wireFormat.priv))
+			raw := []byte(wireFormat.raw)
+			pub := []byte(wireFormat.pub)
+			priv := []byte(wireFormat.priv)
+			if wireFormat.pub != nil {
+				t.Run("pub", func(t *testing.T) {
+					testMessageProtectionPub(t, tc, &ctx, raw, pub)
+				})
+			}
+			t.Run("priv", func(t *testing.T) {
+				testMessageProtectionPriv(t, tc, &ctx, raw, priv)
+			})
 		})
 	}
 }
