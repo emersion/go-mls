@@ -380,6 +380,7 @@ func (w *welcome) process(ref keyPackageRef, initKeyPriv []byte, signerPub signa
 		return fmt.Errorf("TODO: welcome.process with psks")
 	}
 
+	// TODO: de-duplicate with extractWelcomeAndEpochSecret
 	_, kdf, aead := cs.hpke().Params()
 	kdfSecret := make([]byte, kdf.ExtractSize())
 	kdfSalt := groupSecrets.joinerSecret

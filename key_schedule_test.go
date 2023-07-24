@@ -90,7 +90,10 @@ type keyScheduleTest struct {
 }
 
 func testKeySchedule(t *testing.T, tc *keyScheduleTest) {
+	initSecret := []byte(tc.InitialInitSecret)
 	for i, epoch := range tc.Epochs {
+		t.Logf("epoch %d", i)
+
 		ctx := groupContext{
 			version:                 protocolVersionMLS10,
 			cipherSuite:             tc.CipherSuite,
@@ -106,7 +109,49 @@ func testKeySchedule(t *testing.T, tc *keyScheduleTest) {
 			t.Errorf("marshal(groupContext) = %v, want %v", rawCtx, epoch.GroupContext)
 		}
 
-		// TODO: verify key schedule outputs, external pub, exporter secret
+		joinerSecret, err := ctx.extractJoinerSecret(initSecret, []byte(epoch.CommitSecret))
+		if err != nil {
+			t.Errorf("extractJoinerSecret() = %v", err)
+		} else if !bytes.Equal(joinerSecret, []byte(epoch.JoinerSecret)) {
+			t.Errorf("extractJoinerSecret() = %v, want %v", joinerSecret, epoch.JoinerSecret)
+		}
+
+		welcomeSecret, epochSecret, err := ctx.extractWelcomeAndEpochSecret(joinerSecret, []byte(epoch.PSKSecret))
+		if err != nil {
+			t.Errorf("extractWelcomeAndEpochSecret() = %v", err)
+		} else if !bytes.Equal(welcomeSecret, []byte(epoch.WelcomeSecret)) {
+			t.Errorf("extractWelcomeAndEpochSecret(): welcomeSecret = %v, want %v", welcomeSecret, epoch.WelcomeSecret)
+		}
+
+		initSecret, err = ctx.cipherSuite.deriveSecret(epochSecret, secretLabelInit)
+		if err != nil {
+			t.Errorf("deriveSecret(init) = %v", err)
+		} else if !bytes.Equal(initSecret, []byte(epoch.InitSecret)) {
+			t.Errorf("deriveSecret(init) = %v, want %v", initSecret, epoch.InitSecret)
+		}
+
+		secrets := []struct {
+			label []byte
+			want  testBytes
+		}{
+			{secretLabelSenderData, epoch.SenderDataSecret},
+			{secretLabelEncryption, epoch.EncryptionSecret},
+			{secretLabelExporter, epoch.ExporterSecret},
+			{secretLabelExternal, epoch.ExternalSecret},
+			{secretLabelConfirm, epoch.ConfirmationKey},
+			{secretLabelMembership, epoch.MembershipKey},
+			{secretLabelResumption, epoch.ResumptionPSK},
+		}
+		for _, secret := range secrets {
+			sec, err := ctx.cipherSuite.deriveSecret(epochSecret, secret.label)
+			if err != nil {
+				t.Errorf("deriveSecret(%v) = %v", string(secret.label), err)
+			} else if !bytes.Equal(sec, []byte(secret.want)) {
+				t.Errorf("deriveSecret(%v) = %v, want %v", string(secret.label), sec, secret.want)
+			}
+		}
+
+		// TODO: verify external pub, exporter secret
 	}
 }
 

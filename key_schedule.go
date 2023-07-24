@@ -53,6 +53,57 @@ func (ctx *groupContext) marshal(b *cryptobyte.Builder) {
 	marshalExtensionVec(b, ctx.extensions)
 }
 
+func (ctx *groupContext) extractJoinerSecret(prevInitSecret, commitSecret []byte) ([]byte, error) {
+	cs := ctx.cipherSuite
+	_, kdf, _ := cs.hpke().Params()
+
+	extracted := kdf.Extract(commitSecret, prevInitSecret)
+
+	rawGroupContext, err := marshal(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return cs.expandWithLabel(extracted, []byte("joiner"), rawGroupContext, uint16(kdf.ExtractSize()))
+}
+
+func (ctx *groupContext) extractWelcomeAndEpochSecret(joinerSecret, pskSecret []byte) (welcomeSecret, epochSecret []byte, err error) {
+	cs := ctx.cipherSuite
+	_, kdf, _ := cs.hpke().Params()
+
+	if pskSecret == nil {
+		pskSecret = make([]byte, kdf.ExtractSize())
+	}
+	extracted := kdf.Extract(pskSecret, joinerSecret)
+
+	welcomeSecret, err = cs.deriveSecret(extracted, []byte("welcome"))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	rawGroupContext, err := marshal(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	epochSecret, err = cs.expandWithLabel(extracted, []byte("epoch"), rawGroupContext, uint16(kdf.ExtractSize()))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return welcomeSecret, epochSecret, nil
+}
+
+var (
+	secretLabelInit           = []byte("init")
+	secretLabelSenderData     = []byte("sender data")
+	secretLabelEncryption     = []byte("encryption")
+	secretLabelExporter       = []byte("exporter")
+	secretLabelExternal       = []byte("external")
+	secretLabelConfirm        = []byte("confirm")
+	secretLabelMembership     = []byte("membership")
+	secretLabelResumption     = []byte("resumption")
+	secretLabelAuthentication = []byte("authentication")
+)
+
 type pskType uint8
 
 const (
