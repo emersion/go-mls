@@ -467,7 +467,18 @@ func (w *welcome) process(ref keyPackageRef, initKeyPriv []byte, signerPub signa
 		return fmt.Errorf("mls: group info signature verification failed")
 	}
 
-	// TODO: verify confirmation tag in group info
+	epochSecret, err := groupInfo.groupContext.extractEpochSecret(groupSecrets.joinerSecret, nil)
+	if err != nil {
+		return err
+	}
+	confirmationKey, err := cs.deriveSecret(epochSecret, secretLabelConfirm)
+	if err != nil {
+		return err
+	}
+
+	if !cs.verifyMAC(confirmationKey, groupInfo.groupContext.confirmedTranscriptHash, groupInfo.confirmationTag) {
+		return fmt.Errorf("mls: invalid group info confirmation tag MAC")
+	}
 
 	return nil
 }

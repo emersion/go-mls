@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/hmac"
 	"crypto/rand"
 	_ "crypto/sha256"
 	_ "crypto/sha512"
@@ -114,6 +115,17 @@ var cipherSuiteDescriptions = map[cipherSuite]cipherSuiteDescription{
 		hpke: hpke.NewSuite(hpke.KEM_P384_HKDF_SHA384, hpke.KDF_HKDF_SHA384, hpke.AEAD_AES256GCM),
 		sig:  ecdsaSignatureScheme{elliptic.P384(), crypto.SHA384},
 	},
+}
+
+func (cs cipherSuite) signMAC(key, message []byte) []byte {
+	// All cipher suites use HMAC
+	mac := hmac.New(cs.hash().New, key)
+	mac.Write(message)
+	return mac.Sum(nil)
+}
+
+func (cs cipherSuite) verifyMAC(key, message, tag []byte) bool {
+	return hmac.Equal(tag, cs.signMAC(key, message))
 }
 
 func (cs cipherSuite) refHash(label, value []byte) ([]byte, error) {
