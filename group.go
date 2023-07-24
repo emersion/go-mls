@@ -409,78 +409,80 @@ func (w *welcome) findSecret(ref keyPackageRef) *encryptedGroupSecrets {
 	return nil
 }
 
-func (w *welcome) process(ref keyPackageRef, initKeyPriv []byte, signerPub signaturePublicKey) error {
+func (w *welcome) decryptGroupSecrets(ref keyPackageRef, initKeyPriv []byte) (*groupSecrets, error) {
 	cs := w.cipherSuite
-	_, _, aead := cs.hpke().Params()
 
 	sec := w.findSecret(ref)
 	if sec == nil {
-		return fmt.Errorf("mls: encrypted group secrets not found for provided key package ref")
+		return nil, fmt.Errorf("mls: encrypted group secrets not found for provided key package ref")
 	}
 
 	rawGroupSecrets, err := cs.decryptWithLabel(initKeyPriv, []byte("Welcome"), w.encryptedGroupInfo, sec.encryptedGroupSecrets.kemOutput, sec.encryptedGroupSecrets.ciphertext)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var groupSecrets groupSecrets
 	if err := unmarshal(rawGroupSecrets, &groupSecrets); err != nil {
-		return err
+		return nil, err
 	}
 
-	if len(groupSecrets.psks) > 0 {
-		return fmt.Errorf("TODO: welcome.process with psks")
-	}
+	return &groupSecrets, err
+}
 
-	welcomeSecret, err := extractWelcomeSecret(cs, groupSecrets.joinerSecret, nil)
+func (w *welcome) decryptGroupInfo(joinerSecret, pskSecret []byte, signerPub signaturePublicKey) (*groupInfo, error) {
+	cs := w.cipherSuite
+	_, _, aead := cs.hpke().Params()
+
+	welcomeSecret, err := extractWelcomeSecret(cs, joinerSecret, pskSecret)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	welcomeNonce, err := cs.expandWithLabel(welcomeSecret, []byte("nonce"), nil, uint16(aead.NonceSize()))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	welcomeKey, err := cs.expandWithLabel(welcomeSecret, []byte("key"), nil, uint16(aead.KeySize()))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	welcomeCipher, err := aead.New(welcomeKey)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	rawGroupInfo, err := welcomeCipher.Open(nil, welcomeNonce, w.encryptedGroupInfo, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var groupInfo groupInfo
 	if err := unmarshal(rawGroupInfo, &groupInfo); err != nil {
-		return err
+		return nil, err
 	}
 
 	groupInfoTBS, err := marshal((*groupInfoTBS)(&groupInfo))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !cs.verifyWithLabel([]byte(signerPub), []byte("GroupInfoTBS"), groupInfoTBS, groupInfo.signature) {
-		return fmt.Errorf("mls: group info signature verification failed")
+		return nil, fmt.Errorf("mls: group info signature verification failed")
 	}
 
-	epochSecret, err := groupInfo.groupContext.extractEpochSecret(groupSecrets.joinerSecret, nil)
+	epochSecret, err := groupInfo.groupContext.extractEpochSecret(joinerSecret, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	confirmationKey, err := cs.deriveSecret(epochSecret, secretLabelConfirm)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if !cs.verifyMAC(confirmationKey, groupInfo.groupContext.confirmedTranscriptHash, groupInfo.confirmationTag) {
-		return fmt.Errorf("mls: invalid group info confirmation tag MAC")
+		return nil, fmt.Errorf("mls: invalid group info confirmation tag MAC")
 	}
 
-	return nil
+	return &groupInfo, nil
 }
 
 type encryptedGroupSecrets struct {

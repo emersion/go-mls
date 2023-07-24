@@ -38,7 +38,13 @@ func testWelcome(t *testing.T, tc *welcomeTest) {
 		t.Fatalf("keyPackage.generateRef() = %v", err)
 	}
 
-	if err := welcome.process(keyPackageRef, []byte(tc.InitPriv), signaturePublicKey(tc.SignerPub)); err != nil {
+	groupSecrets, err := welcome.decryptGroupSecrets(keyPackageRef, []byte(tc.InitPriv))
+	if err != nil {
+		t.Fatalf("welcome.decryptGroupSecrets() = %v", err)
+	}
+
+	_, err = welcome.decryptGroupInfo(groupSecrets.joinerSecret, nil, signaturePublicKey(tc.SignerPub))
+	if err != nil {
 		t.Fatalf("welcome.process() = %v", err)
 	}
 }
