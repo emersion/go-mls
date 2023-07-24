@@ -274,16 +274,18 @@ func (info *groupInfo) unmarshal(s *cryptobyte.String) error {
 	return nil
 }
 
-func (info *groupInfo) marshalTBS(b *cryptobyte.Builder) {
+func (info *groupInfo) marshal(b *cryptobyte.Builder) {
+	(*groupInfoTBS)(info).marshal(b)
+	writeOpaqueVec(b, info.signature)
+}
+
+type groupInfoTBS groupInfo
+
+func (info *groupInfoTBS) marshal(b *cryptobyte.Builder) {
 	info.groupContext.marshal(b)
 	marshalExtensionVec(b, info.extensions)
 	writeOpaqueVec(b, info.confirmationTag)
 	b.AddUint32(uint32(info.signer))
-}
-
-func (info *groupInfo) marshal(b *cryptobyte.Builder) {
-	info.marshalTBS(b)
-	writeOpaqueVec(b, info.signature)
 }
 
 type groupSecrets struct {
@@ -411,7 +413,7 @@ func (w *welcome) process(ref keyPackageRef, initKeyPriv []byte, signerPub signa
 		return err
 	}
 
-	groupInfoTBS, err := marshalTBS(&groupInfo)
+	groupInfoTBS, err := marshal((*groupInfoTBS)(&groupInfo))
 	if err != nil {
 		return err
 	}
