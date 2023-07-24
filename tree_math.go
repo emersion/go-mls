@@ -97,6 +97,12 @@ func (n numLeaves) copath(x nodeIndex) []nodeIndex {
 // nodeIndex is the index of a node in a tree.
 type nodeIndex uint32
 
+// isLeaf returns true if this is a leaf node, false if this is an intermediate
+// node.
+func (x nodeIndex) isLeaf() bool {
+	return x%2 == 0
+}
+
 // left returns the index of the left child for an intermediate node index.
 func (x nodeIndex) left() (nodeIndex, bool) {
 	lvl := x.level()
@@ -130,6 +136,13 @@ func (x nodeIndex) level() uint32 {
 	return lvl
 }
 
+type leafIndex uint32
+
+// nodeIndex returns the index of the node from a leaf index.
+func (li leafIndex) nodeIndex() nodeIndex {
+	return nodeIndex(2 * li)
+}
+
 // log2 computes the exponent of the largest power of 2 less than x.
 func log2(x uint32) uint32 {
 	if x == 0 {
@@ -141,4 +154,8 @@ func log2(x uint32) uint32 {
 		k++
 	}
 	return k - 1
+}
+
+func isPowerOf2(x uint32) bool {
+	return x != 0 && x&(x-1) == 0
 }

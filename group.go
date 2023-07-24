@@ -94,12 +94,12 @@ func (upd *update) unmarshal(s *cryptobyte.String) error {
 }
 
 type remove struct {
-	removed uint32
+	removed leafIndex
 }
 
 func (rm *remove) unmarshal(s *cryptobyte.String) error {
 	*rm = remove{}
-	if !s.ReadUint32(&rm.removed) {
+	if !s.ReadUint32((*uint32)(&rm.removed)) {
 		return io.ErrUnexpectedEOF
 	}
 	return nil
@@ -250,7 +250,7 @@ type groupInfo struct {
 	groupContext    groupContext
 	extensions      []extension
 	confirmationTag []byte
-	signer          uint32
+	signer          leafIndex
 	signature       []byte
 }
 
@@ -267,7 +267,7 @@ func (info *groupInfo) unmarshal(s *cryptobyte.String) error {
 	}
 	info.extensions = exts
 
-	if !readOpaqueVec(s, &info.confirmationTag) || !s.ReadUint32(&info.signer) || !readOpaqueVec(s, &info.signature) {
+	if !readOpaqueVec(s, &info.confirmationTag) || !s.ReadUint32((*uint32)(&info.signer)) || !readOpaqueVec(s, &info.signature) {
 		return err
 	}
 
@@ -278,7 +278,7 @@ func (info *groupInfo) marshalTBS(b *cryptobyte.Builder) {
 	info.groupContext.marshal(b)
 	marshalExtensionVec(b, info.extensions)
 	writeOpaqueVec(b, info.confirmationTag)
-	b.AddUint32(info.signer)
+	b.AddUint32(uint32(info.signer))
 }
 
 func (info *groupInfo) marshal(b *cryptobyte.Builder) {

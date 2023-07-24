@@ -10,7 +10,7 @@ import (
 type parentNode struct {
 	encryptionKey  hpkePublicKey
 	parentHash     []byte
-	unmergedLeaves []uint32
+	unmergedLeaves []leafIndex
 }
 
 func (node *parentNode) unmarshal(s *cryptobyte.String) error {
@@ -19,8 +19,8 @@ func (node *parentNode) unmarshal(s *cryptobyte.String) error {
 		return io.ErrUnexpectedEOF
 	}
 	return readVector(s, func(s *cryptobyte.String) error {
-		var i uint32
-		if !s.ReadUint32(&i) {
+		var i leafIndex
+		if !s.ReadUint32((*uint32)(&i)) {
 			return io.ErrUnexpectedEOF
 		}
 		node.unmergedLeaves = append(node.unmergedLeaves, i)
@@ -370,7 +370,7 @@ type ratchetTree []*node
 
 func (tree *ratchetTree) unmarshal(s *cryptobyte.String) error {
 	*tree = ratchetTree{}
-	return readVector(s, func(s *cryptobyte.String) error {
+	err := readVector(s, func(s *cryptobyte.String) error {
 		var n *node
 		var hasNode bool
 		if !readOptional(s, &hasNode) {
@@ -384,4 +384,48 @@ func (tree *ratchetTree) unmarshal(s *cryptobyte.String) error {
 		*tree = append(*tree, n)
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// The raw tree doesn't include blank nodes at the end, fill it until next
+	// power of 2
+	for !isPowerOf2(uint32(len(*tree) + 1)) {
+		*tree = append(*tree, nil)
+	}
+
+	return nil
+}
+
+// index returns the node at the provided index.
+func (tree ratchetTree) index(i nodeIndex) *node {
+	return tree[int(i)]
+}
+
+// resolve computes the resolution of a node.
+func (tree ratchetTree) resolve(x nodeIndex) []nodeIndex {
+	n := tree.index(x)
+	if n == nil {
+		if x.isLeaf() {
+			return nil
+		} else {
+			l, ok := x.left()
+			if !ok {
+				panic("unreachable")
+			}
+			r, ok := x.right()
+			if !ok {
+				panic("unreachable")
+			}
+			return append(tree.resolve(l), tree.resolve(r)...)
+		}
+	} else {
+		res := []nodeIndex{x}
+		if n.nodeType == nodeTypeParent {
+			for _, leafIndex := range n.parentNode.unmergedLeaves {
+				res = append(res, leafIndex.nodeIndex())
+			}
+		}
+		return res
+	}
 }

@@ -56,8 +56,8 @@ func (st *senderType) unmarshal(s *cryptobyte.String) error {
 
 type sender struct {
 	senderType  senderType
-	leafIndex   uint32 // for senderTypeMember
-	senderIndex uint32 // for senderTypeExternal
+	leafIndex   leafIndex // for senderTypeMember
+	senderIndex uint32    // for senderTypeExternal
 }
 
 func (snd *sender) unmarshal(s *cryptobyte.String) error {
@@ -67,7 +67,7 @@ func (snd *sender) unmarshal(s *cryptobyte.String) error {
 	}
 	switch snd.senderType {
 	case senderTypeMember:
-		if !s.ReadUint32(&snd.leafIndex) {
+		if !s.ReadUint32((*uint32)(&snd.leafIndex)) {
 			return io.ErrUnexpectedEOF
 		}
 	case senderTypeExternal:
@@ -296,7 +296,7 @@ type privateMessageContent struct {
 }
 
 type senderData struct {
-	leafIndex  uint32
+	leafIndex  leafIndex
 	generation uint32
 	reuseGuard [4]byte
 }
