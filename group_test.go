@@ -45,7 +45,7 @@ func testWelcome(t *testing.T, tc *welcomeTest) {
 
 	_, err = welcome.decryptGroupInfo(groupSecrets.joinerSecret, nil, signaturePublicKey(tc.SignerPub))
 	if err != nil {
-		t.Fatalf("welcome.process() = %v", err)
+		t.Fatalf("welcome.decryptGroupInfo() = %v", err)
 	}
 }
 
