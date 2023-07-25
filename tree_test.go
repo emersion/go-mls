@@ -36,14 +36,16 @@ func testTreeValidation(t *testing.T, tc *treeValidationTest) {
 
 	for i, want := range tc.TreeHashes {
 		x := nodeIndex(i)
-		if h, err := tree.hash(tc.CipherSuite, x); err != nil {
-			t.Errorf("hash(%v) = %v", x, err)
+		if h, err := tree.computeTreeHash(tc.CipherSuite, x, nil); err != nil {
+			t.Errorf("computeTreeHash(%v) = %v", x, err)
 		} else if !bytes.Equal(h, []byte(want)) {
-			t.Errorf("hash(%v) = %v, want %v", x, h, want)
+			t.Errorf("computeTreeHash(%v) = %v, want %v", x, h, want)
 		}
 	}
 
-	// TODO: check parent hashes
+	if !tree.verifyParentHashes(tc.CipherSuite) {
+		t.Errorf("verifyParentHashes() failed")
+	}
 
 	groupID := GroupID(tc.GroupID)
 	for i, node := range tree {

@@ -1,6 +1,7 @@
 package mls
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
@@ -34,6 +35,24 @@ func (node *parentNode) marshal(b *cryptobyte.Builder) {
 	writeVector(b, len(node.unmergedLeaves), func(b *cryptobyte.Builder, i int) {
 		b.AddUint32(uint32(node.unmergedLeaves[i]))
 	})
+}
+
+func (node *parentNode) computeParentHash(cs cipherSuite, originalSiblingTreeHash []byte) ([]byte, error) {
+	rawInput, err := marshalParentHashInput(node.encryptionKey, node.parentHash, originalSiblingTreeHash)
+	if err != nil {
+		return nil, err
+	}
+	h := cs.hash().New()
+	h.Write(rawInput)
+	return h.Sum(nil), nil
+}
+
+func marshalParentHashInput(encryptionKey hpkePublicKey, parentHash, originalSiblingTreeHash []byte) ([]byte, error) {
+	var b cryptobyte.Builder
+	writeOpaqueVec(&b, []byte(encryptionKey))
+	writeOpaqueVec(&b, parentHash)
+	writeOpaqueVec(&b, originalSiblingTreeHash)
+	return b.Bytes()
 }
 
 type leafNodeSource uint8
@@ -508,13 +527,15 @@ func (tree ratchetTree) resolve(x nodeIndex) []nodeIndex {
 	}
 }
 
-func (tree ratchetTree) hash(cs cipherSuite, x nodeIndex) ([]byte, error) {
+func (tree ratchetTree) computeTreeHash(cs cipherSuite, x nodeIndex, exclude map[leafIndex]struct{}) ([]byte, error) {
 	n := tree.index(x)
 
 	var b cryptobyte.Builder
 	if li, ok := x.leafIndex(); ok {
+		_, excluded := exclude[li]
+
 		var l *leafNode
-		if n != nil {
+		if n != nil && !excluded {
 			l = n.leafNode
 			if l == nil {
 				panic("unreachable")
@@ -528,11 +549,11 @@ func (tree ratchetTree) hash(cs cipherSuite, x nodeIndex) ([]byte, error) {
 			panic("unreachable")
 		}
 
-		leftHash, err := tree.hash(cs, left)
+		leftHash, err := tree.computeTreeHash(cs, left, exclude)
 		if err != nil {
 			return nil, err
 		}
-		rightHash, err := tree.hash(cs, right)
+		rightHash, err := tree.computeTreeHash(cs, right, exclude)
 		if err != nil {
 			return nil, err
 		}
@@ -542,6 +563,19 @@ func (tree ratchetTree) hash(cs cipherSuite, x nodeIndex) ([]byte, error) {
 			p = n.parentNode
 			if p == nil {
 				panic("unreachable")
+			}
+
+			if len(p.unmergedLeaves) > 0 && len(exclude) > 0 {
+				unmergedLeaves := make([]leafIndex, 0, len(p.unmergedLeaves))
+				for _, li := range p.unmergedLeaves {
+					if _, excluded := exclude[li]; !excluded {
+						unmergedLeaves = append(unmergedLeaves, li)
+					}
+				}
+
+				filteredParent := *p
+				filteredParent.unmergedLeaves = unmergedLeaves
+				p = &filteredParent
 			}
 		}
 
@@ -574,4 +608,69 @@ func marshalParentNodeHashInput(b *cryptobyte.Builder, node *parentNode, leftHas
 	}
 	writeOpaqueVec(b, leftHash)
 	writeOpaqueVec(b, rightHash)
+}
+
+func (tree ratchetTree) verifyParentHashes(cs cipherSuite) bool {
+	for i, node := range tree {
+		if node == nil {
+			continue
+		}
+
+		x := nodeIndex(i)
+		l, r, ok := x.children()
+		if !ok {
+			continue
+		}
+
+		parentNode := node.parentNode
+		exclude := make(map[leafIndex]struct{}, len(parentNode.unmergedLeaves))
+		for _, li := range parentNode.unmergedLeaves {
+			exclude[li] = struct{}{}
+		}
+
+		leftTreeHash, err := tree.computeTreeHash(cs, l, exclude)
+		if err != nil {
+			return false
+		}
+		rightTreeHash, err := tree.computeTreeHash(cs, r, exclude)
+		if err != nil {
+			return false
+		}
+
+		leftParentHash, err := parentNode.computeParentHash(cs, rightTreeHash)
+		if err != nil {
+			return false
+		}
+		rightParentHash, err := parentNode.computeParentHash(cs, leftTreeHash)
+		if err != nil {
+			return false
+		}
+
+		isLeftDescendant := tree.findParentHash(tree.resolve(l), leftParentHash)
+		isRightDescendant := tree.findParentHash(tree.resolve(r), rightParentHash)
+		if isLeftDescendant == isRightDescendant {
+			return false
+		}
+	}
+	return true
+}
+
+func (tree ratchetTree) findParentHash(nodeIndices []nodeIndex, parentHash []byte) bool {
+	for _, x := range nodeIndices {
+		node := tree.index(x)
+		if node == nil {
+			continue
+		}
+		var h []byte
+		switch node.nodeType {
+		case nodeTypeLeaf:
+			h = node.leafNode.parentHash
+		case nodeTypeParent:
+			h = node.parentNode.parentHash
+		}
+		if bytes.Equal(h, parentHash) {
+			return true
+		}
+	}
+	return false
 }
