@@ -98,13 +98,8 @@ func testMessageProtectionPub(t *testing.T, tc *messageProtectionTest, ctx *grou
 	}
 	pubMsg := msg.publicMessage
 
-	framedContentTBS := framedContentTBS{
-		version:    msg.version,
-		wireFormat: msg.wireFormat,
-		content:    pubMsg.content,
-		context:    ctx,
-	}
-	if !pubMsg.auth.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), &framedContentTBS) {
+	framedContentTBS := pubMsg.framedContentTBS(ctx)
+	if !pubMsg.auth.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), framedContentTBS) {
 		t.Errorf("verifySignature() failed")
 	}
 
