@@ -43,9 +43,15 @@ func testWelcome(t *testing.T, tc *welcomeTest) {
 		t.Fatalf("welcome.decryptGroupSecrets() = %v", err)
 	}
 
-	_, err = welcome.decryptGroupInfo(groupSecrets.joinerSecret, nil, signaturePublicKey(tc.SignerPub))
+	groupInfo, err := welcome.decryptGroupInfo(groupSecrets.joinerSecret, nil)
 	if err != nil {
 		t.Fatalf("welcome.decryptGroupInfo() = %v", err)
+	}
+	if !groupInfo.verifySignature(signaturePublicKey(tc.SignerPub)) {
+		t.Errorf("groupInfo.verifySignature() failed")
+	}
+	if !groupInfo.verifyConfirmationTag(groupSecrets.joinerSecret) {
+		t.Errorf("groupInfo.verifyConfirmationTag() failed")
 	}
 }
 

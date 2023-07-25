@@ -362,6 +362,28 @@ func (info *groupInfo) marshal(b *cryptobyte.Builder) {
 	writeOpaqueVec(b, info.signature)
 }
 
+func (info *groupInfo) verifySignature(signerPub signaturePublicKey) bool {
+	cs := info.groupContext.cipherSuite
+	tbs, err := marshal((*groupInfoTBS)(info))
+	if err != nil {
+		return false
+	}
+	return cs.verifyWithLabel([]byte(signerPub), []byte("GroupInfoTBS"), tbs, info.signature)
+}
+
+func (info *groupInfo) verifyConfirmationTag(joinerSecret []byte) bool {
+	cs := info.groupContext.cipherSuite
+	epochSecret, err := info.groupContext.extractEpochSecret(joinerSecret, nil)
+	if err != nil {
+		return false
+	}
+	confirmationKey, err := cs.deriveSecret(epochSecret, secretLabelConfirm)
+	if err != nil {
+		return false
+	}
+	return cs.verifyMAC(confirmationKey, info.groupContext.confirmedTranscriptHash, info.confirmationTag)
+}
+
 type groupInfoTBS groupInfo
 
 func (info *groupInfoTBS) marshal(b *cryptobyte.Builder) {
@@ -483,7 +505,7 @@ func (w *welcome) decryptGroupSecrets(ref keyPackageRef, initKeyPriv []byte) (*g
 	return &groupSecrets, err
 }
 
-func (w *welcome) decryptGroupInfo(joinerSecret, pskSecret []byte, signerPub signaturePublicKey) (*groupInfo, error) {
+func (w *welcome) decryptGroupInfo(joinerSecret, pskSecret []byte) (*groupInfo, error) {
 	cs := w.cipherSuite
 	_, _, aead := cs.hpke().Params()
 
@@ -513,27 +535,6 @@ func (w *welcome) decryptGroupInfo(joinerSecret, pskSecret []byte, signerPub sig
 	var groupInfo groupInfo
 	if err := unmarshal(rawGroupInfo, &groupInfo); err != nil {
 		return nil, err
-	}
-
-	groupInfoTBS, err := marshal((*groupInfoTBS)(&groupInfo))
-	if err != nil {
-		return nil, err
-	}
-	if !cs.verifyWithLabel([]byte(signerPub), []byte("GroupInfoTBS"), groupInfoTBS, groupInfo.signature) {
-		return nil, fmt.Errorf("mls: group info signature verification failed")
-	}
-
-	epochSecret, err := groupInfo.groupContext.extractEpochSecret(joinerSecret, nil)
-	if err != nil {
-		return nil, err
-	}
-	confirmationKey, err := cs.deriveSecret(epochSecret, secretLabelConfirm)
-	if err != nil {
-		return nil, err
-	}
-
-	if !cs.verifyMAC(confirmationKey, groupInfo.groupContext.confirmedTranscriptHash, groupInfo.confirmationTag) {
-		return nil, fmt.Errorf("mls: invalid group info confirmation tag MAC")
 	}
 
 	return &groupInfo, nil
