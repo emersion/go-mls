@@ -249,6 +249,19 @@ type authenticatedContent struct {
 	auth       framedContentAuthData
 }
 
+func (authContent *authenticatedContent) unmarshal(s *cryptobyte.String) error {
+	if err := authContent.wireFormat.unmarshal(s); err != nil {
+		return err
+	}
+	if err := authContent.content.unmarshal(s); err != nil {
+		return err
+	}
+	if err := authContent.auth.unmarshal(s, authContent.content.contentType); err != nil {
+		return err
+	}
+	return nil
+}
+
 type framedContentAuthData struct {
 	signature       []byte
 	confirmationTag []byte // for contentTypeCommit
@@ -270,8 +283,14 @@ func (authData *framedContentAuthData) unmarshal(s *cryptobyte.String, ct conten
 	return nil
 }
 
-func (authData *framedContentAuthData) verify(cs cipherSuite, verifKey []byte, content *framedContentTBS) bool {
-	// TODO: check confirmationTag
+func (authData *framedContentAuthData) verifyConfirmationTag(cs cipherSuite, confirmationKey, confirmedTranscriptHash []byte) bool {
+	if len(authData.confirmationTag) == 0 {
+		return false
+	}
+	return cs.verifyMAC(confirmationKey, confirmedTranscriptHash, authData.confirmationTag)
+}
+
+func (authData *framedContentAuthData) verifySignature(cs cipherSuite, verifKey []byte, content *framedContentTBS) bool {
 	rawContent, err := marshal(content)
 	if err != nil {
 		return false

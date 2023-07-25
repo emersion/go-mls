@@ -170,3 +170,41 @@ func TestKeySchedule(t *testing.T) {
 		})
 	}
 }
+
+type transcriptHashesTest struct {
+	CipherSuite cipherSuite `json:"cipher_suite"`
+
+	ConfirmationKey             testBytes `json:"confirmation_key"`
+	AuthenticatedContent        testBytes `json:"authenticated_content"`
+	InterimTranscriptHashBefore testBytes `json"interim_transcript_hash_before"`
+
+	ConfirmedTranscriptHashAfter testBytes `json:"confirmed_transcript_hash_after"`
+	InterimTranscriptHashAfter   testBytes `json:"interim_transcript_hash_after"`
+}
+
+func testTranscriptHashes(t *testing.T, tc *transcriptHashesTest) {
+	cs := tc.CipherSuite
+	confirmationKey := []byte(tc.ConfirmationKey)
+
+	var authContent authenticatedContent
+	if err := unmarshal([]byte(tc.AuthenticatedContent), &authContent); err != nil {
+		t.Fatalf("unmarshal() = %v", err)
+	} else if authContent.content.contentType != contentTypeCommit {
+		t.Fatalf("contentType = %v, want %v", authContent.content.contentType, contentTypeCommit)
+	}
+
+	if !authContent.auth.verifyConfirmationTag(cs, confirmationKey, []byte(tc.ConfirmedTranscriptHashAfter)) {
+		t.Errorf("verifyConfirmationTag() failed")
+	}
+}
+
+func TestTranscriptHashes(t *testing.T) {
+	var tests []transcriptHashesTest
+	loadTestVector(t, "testdata/transcript-hashes.json", &tests)
+
+	for i, tc := range tests {
+		t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
+			testTranscriptHashes(t, &tc)
+		})
+	}
+}
