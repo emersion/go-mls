@@ -90,6 +90,8 @@ func (prop *proposal) marshal(b *cryptobyte.Builder) {
 		prop.remove.marshal(b)
 	case proposalTypePSK:
 		prop.preSharedKey.marshal(b)
+	case proposalTypeReinit:
+		prop.reInit.marshal(b)
 	default:
 		b.SetError(fmt.Errorf("TODO: proposal.marshal"))
 	}
@@ -171,6 +173,13 @@ func (ri *reInit) unmarshal(s *cryptobyte.String) error {
 	ri.extensions = exts
 
 	return nil
+}
+
+func (ri *reInit) marshal(b *cryptobyte.Builder) {
+	writeOpaqueVec(b, []byte(ri.groupID))
+	b.AddUint16(uint16(ri.version))
+	b.AddUint16(uint16(ri.cipherSuite))
+	marshalExtensionVec(b, ri.extensions)
 }
 
 type externalInit struct {
