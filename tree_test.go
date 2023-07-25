@@ -95,7 +95,13 @@ func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
 
 	switch prop.proposalType {
 	case proposalTypeAdd:
-		// TODO: verify key package
+		ctx := groupContext{
+			version:     prop.add.keyPackage.version,
+			cipherSuite: prop.add.keyPackage.cipherSuite,
+		}
+		if err := prop.add.keyPackage.verify(&ctx); err != nil {
+			t.Errorf("keyPackage.verify() = %v", err)
+		}
 		tree.add(&prop.add.keyPackage.leafNode)
 	case proposalTypeUpdate:
 		// TODO: verify leaf node
