@@ -106,6 +106,48 @@ var (
 	secretLabelAuthentication = []byte("authentication")
 )
 
+type confirmedTranscriptHashInput struct {
+	wireFormat wireFormat
+	content    framedContent
+	signature  []byte
+}
+
+func (input *confirmedTranscriptHashInput) marshal(b *cryptobyte.Builder) {
+	if input.content.contentType != contentTypeCommit {
+		b.SetError(fmt.Errorf("mls: confirmedTranscriptHashInput can only contain contentTypeCommit"))
+		return
+	}
+	input.wireFormat.marshal(b)
+	input.content.marshal(b)
+	writeOpaqueVec(b, input.signature)
+}
+
+func (input *confirmedTranscriptHashInput) hash(cs cipherSuite, interimTranscriptHashBefore []byte) ([]byte, error) {
+	rawInput, err := marshal(input)
+	if err != nil {
+		return nil, err
+	}
+
+	h := cs.hash().New()
+	h.Write(interimTranscriptHashBefore)
+	h.Write(rawInput)
+	return h.Sum(nil), nil
+}
+
+func nextInterimTranscriptHash(cs cipherSuite, confirmedTranscriptHash, confirmationTag []byte) ([]byte, error) {
+	var b cryptobyte.Builder
+	writeOpaqueVec(&b, confirmationTag)
+	rawInput, err := b.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	h := cs.hash().New()
+	h.Write(confirmedTranscriptHash)
+	h.Write(rawInput)
+	return h.Sum(nil), nil
+}
+
 type pskType uint8
 
 const (

@@ -119,6 +119,10 @@ func (wf *wireFormat) unmarshal(s *cryptobyte.String) error {
 	}
 }
 
+func (wf wireFormat) marshal(b *cryptobyte.Builder) {
+	b.AddUint16(uint16(wf))
+}
+
 // GroupID is an application-specific group identifier.
 type GroupID []byte
 
@@ -232,7 +236,7 @@ func (msg *mlsMessage) unmarshal(s *cryptobyte.String) error {
 
 func (msg *mlsMessage) marshal(b *cryptobyte.Builder) {
 	b.AddUint16(uint16(msg.version))
-	b.AddUint16(uint16(msg.wireFormat))
+	msg.wireFormat.marshal(b)
 	switch msg.wireFormat {
 	case wireFormatMLSPublicMessage:
 		msg.publicMessage.marshal(b)
@@ -266,6 +270,14 @@ func (authContent *authenticatedContent) unmarshal(s *cryptobyte.String) error {
 		return err
 	}
 	return nil
+}
+
+func (authContent *authenticatedContent) confirmedTranscriptHashInput() *confirmedTranscriptHashInput {
+	return &confirmedTranscriptHashInput{
+		wireFormat: authContent.wireFormat,
+		content:    authContent.content,
+		signature:  authContent.auth.signature,
+	}
 }
 
 type framedContentAuthData struct {
@@ -321,7 +333,7 @@ type framedContentTBS struct {
 
 func (content *framedContentTBS) marshal(b *cryptobyte.Builder) {
 	b.AddUint16(uint16(content.version))
-	b.AddUint16(uint16(content.wireFormat))
+	content.wireFormat.marshal(b)
 	content.content.marshal(b)
 	switch content.content.sender.senderType {
 	case senderTypeMember, senderTypeNewMemberCommit:

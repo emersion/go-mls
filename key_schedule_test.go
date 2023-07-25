@@ -176,7 +176,7 @@ type transcriptHashesTest struct {
 
 	ConfirmationKey             testBytes `json:"confirmation_key"`
 	AuthenticatedContent        testBytes `json:"authenticated_content"`
-	InterimTranscriptHashBefore testBytes `json"interim_transcript_hash_before"`
+	InterimTranscriptHashBefore testBytes `json:"interim_transcript_hash_before"`
 
 	ConfirmedTranscriptHashAfter testBytes `json:"confirmed_transcript_hash_after"`
 	InterimTranscriptHashAfter   testBytes `json:"interim_transcript_hash_after"`
@@ -184,7 +184,6 @@ type transcriptHashesTest struct {
 
 func testTranscriptHashes(t *testing.T, tc *transcriptHashesTest) {
 	cs := tc.CipherSuite
-	confirmationKey := []byte(tc.ConfirmationKey)
 
 	var authContent authenticatedContent
 	if err := unmarshal([]byte(tc.AuthenticatedContent), &authContent); err != nil {
@@ -193,8 +192,22 @@ func testTranscriptHashes(t *testing.T, tc *transcriptHashesTest) {
 		t.Fatalf("contentType = %v, want %v", authContent.content.contentType, contentTypeCommit)
 	}
 
-	if !authContent.auth.verifyConfirmationTag(cs, confirmationKey, []byte(tc.ConfirmedTranscriptHashAfter)) {
+	if !authContent.auth.verifyConfirmationTag(cs, []byte(tc.ConfirmationKey), []byte(tc.ConfirmedTranscriptHashAfter)) {
 		t.Errorf("verifyConfirmationTag() failed")
+	}
+
+	confirmedTranscriptHashAfter, err := authContent.confirmedTranscriptHashInput().hash(cs, []byte(tc.InterimTranscriptHashBefore))
+	if err != nil {
+		t.Fatalf("confirmedTranscriptHashInput.hash() = %v", err)
+	} else if !bytes.Equal(confirmedTranscriptHashAfter, []byte(tc.ConfirmedTranscriptHashAfter)) {
+		t.Errorf("confirmedTranscriptHashInput.hash() = %v, want %v", confirmedTranscriptHashAfter, tc.ConfirmedTranscriptHashAfter)
+	}
+
+	interimTranscriptHashAfter, err := nextInterimTranscriptHash(cs, confirmedTranscriptHashAfter, authContent.auth.confirmationTag)
+	if err != nil {
+		t.Fatalf("nextInterimTranscriptHash() = %v", err)
+	} else if !bytes.Equal(interimTranscriptHashAfter, []byte(tc.InterimTranscriptHashAfter)) {
+		t.Errorf("nextInterimTranscriptHash() = %v, want %v", interimTranscriptHashAfter, tc.InterimTranscriptHashAfter)
 	}
 }
 
