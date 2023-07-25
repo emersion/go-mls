@@ -45,7 +45,7 @@ func testMessages(t *testing.T, tc map[string]testBytes) {
 
 			// TODO: enable for all messages
 			switch msg.name {
-			case "mls_group_info", "mls_key_package", "add_proposal", "update_proposal", "remove_proposal", "pre_shared_key_proposal", "re_init_proposal", "external_init_proposal":
+			case "mls_group_info", "mls_key_package", "add_proposal", "update_proposal", "remove_proposal", "pre_shared_key_proposal", "re_init_proposal", "external_init_proposal", "group_context_extensions_proposal":
 				v := msg.v.(marshaler)
 				out, err := marshal(v)
 				if err != nil {

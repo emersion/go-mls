@@ -94,8 +94,10 @@ func (prop *proposal) marshal(b *cryptobyte.Builder) {
 		prop.reInit.marshal(b)
 	case proposalTypeExternalInit:
 		prop.externalInit.marshal(b)
+	case proposalTypeGroupContextExtensions:
+		prop.groupContextExtensions.marshal(b)
 	default:
-		b.SetError(fmt.Errorf("TODO: proposal.marshal"))
+		panic("unreachable")
 	}
 }
 
@@ -214,6 +216,10 @@ func (exts *groupContextExtensions) unmarshal(s *cryptobyte.String) error {
 	exts.extensions = l
 
 	return nil
+}
+
+func (exts *groupContextExtensions) marshal(b *cryptobyte.Builder) {
+	marshalExtensionVec(b, exts.extensions)
 }
 
 type proposalOrRefType uint8
