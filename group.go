@@ -82,6 +82,8 @@ func (prop *proposal) unmarshal(s *cryptobyte.String) error {
 func (prop *proposal) marshal(b *cryptobyte.Builder) {
 	prop.proposalType.marshal(b)
 	switch prop.proposalType {
+	case proposalTypeAdd:
+		prop.add.marshal(b)
 	case proposalTypeRemove:
 		prop.remove.marshal(b)
 	case proposalTypePSK:
@@ -98,6 +100,10 @@ type add struct {
 func (a *add) unmarshal(s *cryptobyte.String) error {
 	*a = add{}
 	return a.keyPackage.unmarshal(s)
+}
+
+func (a *add) marshal(b *cryptobyte.Builder) {
+	a.keyPackage.marshal(b)
 }
 
 type update struct {
