@@ -48,7 +48,7 @@ func testMessages(t *testing.T, tc map[string]testBytes) {
 
 			// TODO: enable for all messages
 			switch msg.name {
-			case "mls_welcome", "commit", "public_message_application", "public_message_proposal", "public_message_commit", "private_message":
+			case "mls_welcome", "commit", "public_message_commit", "private_message":
 				return
 			}
 

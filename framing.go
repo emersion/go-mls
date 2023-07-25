@@ -234,6 +234,8 @@ func (msg *mlsMessage) marshal(b *cryptobyte.Builder) {
 	b.AddUint16(uint16(msg.version))
 	b.AddUint16(uint16(msg.wireFormat))
 	switch msg.wireFormat {
+	case wireFormatMLSPublicMessage:
+		msg.publicMessage.marshal(b)
 	case wireFormatMLSGroupInfo:
 		msg.groupInfo.marshal(b)
 	case wireFormatMLSKeyPackage:
@@ -281,6 +283,14 @@ func (authData *framedContentAuthData) unmarshal(s *cryptobyte.String, ct conten
 	}
 
 	return nil
+}
+
+func (authData *framedContentAuthData) marshal(b *cryptobyte.Builder, ct contentType) {
+	writeOpaqueVec(b, authData.signature)
+
+	if ct == contentTypeCommit {
+		writeOpaqueVec(b, authData.confirmationTag)
+	}
 }
 
 func (authData *framedContentAuthData) verifyConfirmationTag(cs cipherSuite, confirmationKey, confirmedTranscriptHash []byte) bool {
@@ -338,6 +348,15 @@ func (msg *publicMessage) unmarshal(s *cryptobyte.String) error {
 	}
 
 	return nil
+}
+
+func (msg *publicMessage) marshal(b *cryptobyte.Builder) {
+	msg.content.marshal(b)
+	msg.auth.marshal(b, msg.content.contentType)
+
+	if msg.content.sender.senderType == senderTypeMember {
+		writeOpaqueVec(b, msg.membershipTag)
+	}
 }
 
 // TODO: add membershipTag verification
