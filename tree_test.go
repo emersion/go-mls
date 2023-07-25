@@ -101,7 +101,8 @@ func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
 		// TODO: verify leaf node
 		tree.update(tc.ProposalSender, &prop.update.leafNode)
 	case proposalTypeRemove:
-		t.Skip("TODO")
+		// TODO: verify leaf index
+		tree.remove(prop.remove.removed)
 	default:
 		panic("unreachable")
 	}

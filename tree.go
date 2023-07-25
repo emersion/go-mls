@@ -745,3 +745,41 @@ func (tree ratchetTree) update(li leafIndex, leafNode *leafNode) {
 		tree.set(ni, nil)
 	}
 }
+
+func (tree *ratchetTree) remove(li leafIndex) {
+	ni := li.nodeIndex()
+
+	numLeaves := tree.numLeaves()
+	for {
+		tree.set(ni, nil)
+
+		var ok bool
+		ni, ok = numLeaves.parent(ni)
+		if !ok {
+			break
+		}
+	}
+
+	li = leafIndex(numLeaves - 1)
+	lastPowerOf2 := len(*tree)
+	for {
+		ni = li.nodeIndex()
+		if tree.get(ni) != nil {
+			break
+		}
+
+		if isPowerOf2(uint32(ni)) {
+			lastPowerOf2 = int(ni)
+		}
+
+		if li == 0 {
+			*tree = nil
+			return
+		}
+		li--
+	}
+
+	if lastPowerOf2 < len(*tree) {
+		*tree = (*tree)[:lastPowerOf2]
+	}
+}
