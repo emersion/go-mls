@@ -401,6 +401,19 @@ func (sec *groupSecrets) unmarshal(s *cryptobyte.String) error {
 	})
 }
 
+func (sec *groupSecrets) marshal(b *cryptobyte.Builder) {
+	writeOpaqueVec(b, sec.joinerSecret)
+
+	writeOptional(b, sec.pathSecret != nil)
+	if sec.pathSecret != nil {
+		writeOpaqueVec(b, sec.pathSecret)
+	}
+
+	writeVector(b, len(sec.psks), func(b *cryptobyte.Builder, i int) {
+		sec.psks[i].marshal(b)
+	})
+}
+
 type welcome struct {
 	cipherSuite        cipherSuite
 	secrets            []encryptedGroupSecrets

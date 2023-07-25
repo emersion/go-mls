@@ -9,7 +9,10 @@ import (
 func testMessages(t *testing.T, tc map[string]testBytes) {
 	msgs := []struct {
 		name string
-		v    unmarshaler
+		v    interface {
+			unmarshaler
+			marshaler
+		}
 	}{
 		{"mls_welcome", new(mlsMessage)},
 		{"mls_group_info", new(mlsMessage)},
@@ -45,14 +48,15 @@ func testMessages(t *testing.T, tc map[string]testBytes) {
 
 			// TODO: enable for all messages
 			switch msg.name {
-			case "mls_group_info", "mls_key_package", "ratchet_tree", "add_proposal", "update_proposal", "remove_proposal", "pre_shared_key_proposal", "re_init_proposal", "external_init_proposal", "group_context_extensions_proposal":
-				v := msg.v.(marshaler)
-				out, err := marshal(v)
-				if err != nil {
-					t.Errorf("marshal() = %v", err)
-				} else if !bytes.Equal(out, raw) {
-					t.Errorf("marshal() = \n%v\nbut want \n%v", out, raw)
-				}
+			case "mls_welcome", "commit", "public_message_application", "public_message_proposal", "public_message_commit", "private_message":
+				return
+			}
+
+			out, err := marshal(msg.v)
+			if err != nil {
+				t.Errorf("marshal() = %v", err)
+			} else if !bytes.Equal(out, raw) {
+				t.Errorf("marshal() = \n%v\nbut want \n%v", out, raw)
 			}
 		})
 	}
