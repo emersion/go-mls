@@ -236,6 +236,8 @@ func (msg *mlsMessage) marshal(b *cryptobyte.Builder) {
 	switch msg.wireFormat {
 	case wireFormatMLSPublicMessage:
 		msg.publicMessage.marshal(b)
+	case wireFormatMLSPrivateMessage:
+		msg.privateMessage.marshal(b)
 	case wireFormatMLSGroupInfo:
 		msg.groupInfo.marshal(b)
 	case wireFormatMLSKeyPackage:
@@ -387,6 +389,15 @@ func (msg *privateMessage) unmarshal(s *cryptobyte.String) error {
 		return io.ErrUnexpectedEOF
 	}
 	return nil
+}
+
+func (msg *privateMessage) marshal(b *cryptobyte.Builder) {
+	writeOpaqueVec(b, []byte(msg.groupID))
+	b.AddUint64(msg.epoch)
+	msg.contentType.marshal(b)
+	writeOpaqueVec(b, msg.authenticatedData)
+	writeOpaqueVec(b, msg.encryptedSenderData)
+	writeOpaqueVec(b, msg.ciphertext)
 }
 
 func (msg *privateMessage) decryptSenderData(cs cipherSuite, senderDataSecret []byte) (*senderData, error) {
