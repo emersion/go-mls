@@ -23,6 +23,13 @@ package mls
 // numLeaves exposes operations on a tree with a given number of leaves.
 type numLeaves uint32
 
+func numLeavesFromWidth(w uint32) numLeaves {
+	if w == 0 {
+		return 0
+	}
+	return numLeaves((w-1)/2 + 1)
+}
+
 // width computes the minimum length of the array, ie. the number of nodes.
 func (n numLeaves) width() uint32 {
 	if n == 0 {

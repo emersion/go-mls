@@ -73,3 +73,49 @@ func TestTreeValidation(t *testing.T) {
 		})
 	}
 }
+
+type treeOperationsTest struct {
+	TreeBefore     testBytes `json:"tree_before"`
+	Proposal       testBytes `json:"proposal"`
+	ProposalSender uint32    `json:"proposal_sender"`
+
+	TreeAfter testBytes `json:"tree_after"`
+}
+
+func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
+	var tree ratchetTree
+	if err := unmarshal([]byte(tc.TreeBefore), &tree); err != nil {
+		t.Fatalf("unmarshal(tree) = %v", err)
+	}
+
+	var prop proposal
+	if err := unmarshal([]byte(tc.Proposal), &prop); err != nil {
+		t.Fatalf("unmarshal(proposal) = %v", err)
+	}
+
+	if prop.proposalType != proposalTypeAdd {
+		t.Skip("TODO")
+	}
+
+	// TODO: verify key package
+
+	tree.add(&prop.add.keyPackage.leafNode)
+
+	rawTree, err := marshal(&tree)
+	if err != nil {
+		t.Fatalf("marshal(tree) = %v", err)
+	} else if !bytes.Equal(rawTree, []byte(tc.TreeAfter)) {
+		t.Errorf("marshal(tree) = %v, want %v", rawTree, tc.TreeAfter)
+	}
+}
+
+func TestTreeOperations(t *testing.T) {
+	var tests []treeOperationsTest
+	loadTestVector(t, "testdata/tree-operations.json", &tests)
+
+	for i, tc := range tests {
+		t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
+			testTreeOperations(t, &tc)
+		})
+	}
+}

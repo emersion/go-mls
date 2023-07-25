@@ -502,14 +502,18 @@ func (tree ratchetTree) marshal(b *cryptobyte.Builder) {
 	})
 }
 
-// index returns the node at the provided index.
-func (tree ratchetTree) index(i nodeIndex) *node {
+// get returns the node at the provided index.
+func (tree ratchetTree) get(i nodeIndex) *node {
 	return tree[int(i)]
+}
+
+func (tree ratchetTree) set(i nodeIndex, node *node) {
+	tree[int(i)] = node
 }
 
 // resolve computes the resolution of a node.
 func (tree ratchetTree) resolve(x nodeIndex) []nodeIndex {
-	n := tree.index(x)
+	n := tree.get(x)
 	if n == nil {
 		l, r, ok := x.children()
 		if !ok {
@@ -528,7 +532,7 @@ func (tree ratchetTree) resolve(x nodeIndex) []nodeIndex {
 }
 
 func (tree ratchetTree) computeTreeHash(cs cipherSuite, x nodeIndex, exclude map[leafIndex]struct{}) ([]byte, error) {
-	n := tree.index(x)
+	n := tree.get(x)
 
 	var b cryptobyte.Builder
 	if li, ok := x.leafIndex(); ok {
@@ -657,7 +661,7 @@ func (tree ratchetTree) verifyParentHashes(cs cipherSuite) bool {
 
 func (tree ratchetTree) findParentHash(nodeIndices []nodeIndex, parentHash []byte) bool {
 	for _, x := range nodeIndices {
-		node := tree.index(x)
+		node := tree.get(x)
 		if node == nil {
 			continue
 		}
@@ -673,4 +677,47 @@ func (tree ratchetTree) findParentHash(nodeIndices []nodeIndex, parentHash []byt
 		}
 	}
 	return false
+}
+
+func (tree *ratchetTree) add(leafNode *leafNode) {
+	li := leafIndex(0)
+	var ni nodeIndex
+	found := false
+	for {
+		ni = li.nodeIndex()
+		if int(ni) >= len(*tree) {
+			break
+		}
+		if tree.get(ni) == nil {
+			found = true
+			break
+		}
+		li++
+	}
+	if !found {
+		ni = nodeIndex(len(*tree) + 1)
+		newLen := ((len(*tree) + 1) << 1) - 1
+		for len(*tree) < newLen {
+			*tree = append(*tree, nil)
+		}
+	}
+
+	numLeaves := numLeavesFromWidth(uint32(len(*tree)))
+	p := ni
+	for {
+		var ok bool
+		p, ok = numLeaves.parent(p)
+		if !ok {
+			break
+		}
+		node := tree.get(p)
+		if node != nil {
+			node.parentNode.unmergedLeaves = append(node.parentNode.unmergedLeaves, li)
+		}
+	}
+
+	tree.set(ni, &node{
+		nodeType: nodeTypeLeaf,
+		leafNode: leafNode,
+	})
 }
