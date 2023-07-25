@@ -382,6 +382,10 @@ func (t *nodeType) unmarshal(s *cryptobyte.String) error {
 	}
 }
 
+func (t nodeType) marshal(b *cryptobyte.Builder) {
+	b.AddUint8(uint8(t))
+}
+
 type node struct {
 	nodeType   nodeType
 	leafNode   *leafNode   // for nodeTypeLeaf
@@ -402,6 +406,18 @@ func (n *node) unmarshal(s *cryptobyte.String) error {
 	case nodeTypeParent:
 		n.parentNode = new(parentNode)
 		return n.parentNode.unmarshal(s)
+	default:
+		panic("unreachable")
+	}
+}
+
+func (n *node) marshal(b *cryptobyte.Builder) {
+	n.nodeType.marshal(b)
+	switch n.nodeType {
+	case nodeTypeLeaf:
+		n.leafNode.marshal(b)
+	case nodeTypeParent:
+		n.parentNode.marshal(b)
 	default:
 		panic("unreachable")
 	}
@@ -436,6 +452,21 @@ func (tree *ratchetTree) unmarshal(s *cryptobyte.String) error {
 	}
 
 	return nil
+}
+
+func (tree ratchetTree) marshal(b *cryptobyte.Builder) {
+	end := len(tree)
+	for end > 0 && tree[end-1] == nil {
+		end--
+	}
+
+	writeVector(b, len(tree[:end]), func(b *cryptobyte.Builder, i int) {
+		n := tree[i]
+		writeOptional(b, n != nil)
+		if n != nil {
+			n.marshal(b)
+		}
+	})
 }
 
 // index returns the node at the provided index.
