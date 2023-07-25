@@ -700,7 +700,7 @@ func (tree *ratchetTree) add(leafNode *leafNode) {
 	}
 	if !found {
 		ni = nodeIndex(len(*tree) + 1)
-		newLen := ((len(*tree) + 1) << 1) - 1
+		newLen := ((len(*tree) + 1) * 2) - 1
 		for len(*tree) < newLen {
 			*tree = append(*tree, nil)
 		}
