@@ -79,3 +79,8 @@ func (hpke *hpkeCiphertext) unmarshal(s *cryptobyte.String) error {
 	}
 	return nil
 }
+
+func (hpke *hpkeCiphertext) marshal(b *cryptobyte.Builder) {
+	writeOpaqueVec(b, hpke.kemOutput)
+	writeOpaqueVec(b, hpke.ciphertext)
+}

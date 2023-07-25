@@ -238,12 +238,14 @@ func (msg *mlsMessage) marshal(b *cryptobyte.Builder) {
 		msg.publicMessage.marshal(b)
 	case wireFormatMLSPrivateMessage:
 		msg.privateMessage.marshal(b)
+	case wireFormatMLSWelcome:
+		msg.welcome.marshal(b)
 	case wireFormatMLSGroupInfo:
 		msg.groupInfo.marshal(b)
 	case wireFormatMLSKeyPackage:
 		msg.keyPackage.marshal(b)
 	default:
-		b.SetError(fmt.Errorf("TODO: mlsMessage.marshal"))
+		panic("unreachable")
 	}
 }
 

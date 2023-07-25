@@ -446,6 +446,14 @@ func (w *welcome) unmarshal(s *cryptobyte.String) error {
 	return nil
 }
 
+func (w *welcome) marshal(b *cryptobyte.Builder) {
+	b.AddUint16(uint16(w.cipherSuite))
+	writeVector(b, len(w.secrets), func(b *cryptobyte.Builder, i int) {
+		w.secrets[i].marshal(b)
+	})
+	writeOpaqueVec(b, w.encryptedGroupInfo)
+}
+
 func (w *welcome) findSecret(ref keyPackageRef) *encryptedGroupSecrets {
 	for i, sec := range w.secrets {
 		if sec.newMember.Equal(ref) {
@@ -545,4 +553,9 @@ func (sec *encryptedGroupSecrets) unmarshal(s *cryptobyte.String) error {
 		return err
 	}
 	return nil
+}
+
+func (sec *encryptedGroupSecrets) marshal(b *cryptobyte.Builder) {
+	writeOpaqueVec(b, []byte(sec.newMember))
+	sec.encryptedGroupSecrets.marshal(b)
 }
