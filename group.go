@@ -92,6 +92,8 @@ func (prop *proposal) marshal(b *cryptobyte.Builder) {
 		prop.preSharedKey.marshal(b)
 	case proposalTypeReinit:
 		prop.reInit.marshal(b)
+	case proposalTypeExternalInit:
+		prop.externalInit.marshal(b)
 	default:
 		b.SetError(fmt.Errorf("TODO: proposal.marshal"))
 	}
@@ -192,6 +194,10 @@ func (ei *externalInit) unmarshal(s *cryptobyte.String) error {
 		return io.ErrUnexpectedEOF
 	}
 	return nil
+}
+
+func (ei *externalInit) marshal(b *cryptobyte.Builder) {
+	writeOpaqueVec(b, ei.kemOutput)
 }
 
 type groupContextExtensions struct {
