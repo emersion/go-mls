@@ -326,7 +326,7 @@ func (node *leafNodeTBS) marshal(b *cryptobyte.Builder) {
 	}
 }
 
-func (node *leafNode) verify(cs cipherSuite, groupID GroupID, li leafIndex) bool {
+func (node *leafNode) verifySignature(cs cipherSuite, groupID GroupID, li leafIndex) bool {
 	leafNodeTBS, err := marshal(&leafNodeTBS{
 		leafNode:  node,
 		groupID:   groupID,

@@ -57,7 +57,7 @@ func testTreeValidation(t *testing.T, tc *treeValidationTest) {
 			t.Errorf("leafIndex(%v) = false", i)
 			continue
 		}
-		if !node.leafNode.verify(tc.CipherSuite, groupID, li) {
+		if !node.leafNode.verifySignature(tc.CipherSuite, groupID, li) {
 			t.Errorf("verify(%v) = false", li)
 		}
 	}
