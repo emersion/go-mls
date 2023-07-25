@@ -325,7 +325,7 @@ func (c *commit) marshal(b *cryptobyte.Builder) {
 	})
 	writeOptional(b, c.path != nil)
 	if c.path != nil {
-		b.SetError(fmt.Errorf("TODO: commit.marshal"))
+		c.path.marshal(b)
 	}
 }
 

@@ -46,12 +46,6 @@ func testMessages(t *testing.T, tc map[string]testBytes) {
 				t.Fatalf("unmarshal() = %v", err)
 			}
 
-			// TODO: enable for all messages
-			switch msg.name {
-			case "commit", "public_message_commit":
-				return
-			}
-
 			out, err := marshal(msg.v)
 			if err != nil {
 				t.Errorf("marshal() = %v", err)

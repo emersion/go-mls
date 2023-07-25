@@ -341,6 +341,13 @@ func (node *updatePathNode) unmarshal(s *cryptobyte.String) error {
 	})
 }
 
+func (node *updatePathNode) marshal(b *cryptobyte.Builder) {
+	writeOpaqueVec(b, []byte(node.encryptionKey))
+	writeVector(b, len(node.encryptedPathSecret), func(b *cryptobyte.Builder, i int) {
+		node.encryptedPathSecret[i].marshal(b)
+	})
+}
+
 type updatePath struct {
 	leafNode leafNode
 	nodes    []updatePathNode
@@ -360,6 +367,13 @@ func (up *updatePath) unmarshal(s *cryptobyte.String) error {
 		}
 		up.nodes = append(up.nodes, node)
 		return nil
+	})
+}
+
+func (up *updatePath) marshal(b *cryptobyte.Builder) {
+	up.leafNode.marshal(b)
+	writeVector(b, len(up.nodes), func(b *cryptobyte.Builder, i int) {
+		up.nodes[i].marshal(b)
 	})
 }
 
