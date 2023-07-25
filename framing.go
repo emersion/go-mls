@@ -375,7 +375,35 @@ func (msg *publicMessage) marshal(b *cryptobyte.Builder) {
 	}
 }
 
-// TODO: add membershipTag verification
+func (msg *publicMessage) verifyMembershipTag(cs cipherSuite, membershipKey []byte, ctx *groupContext) bool {
+	if msg.content.sender.senderType != senderTypeMember {
+		return false
+	}
+	authContentTBM := authenticatedContentTBM{
+		contentTBS: framedContentTBS{
+			version:    protocolVersionMLS10,
+			wireFormat: wireFormatMLSPublicMessage,
+			content:    msg.content,
+			context:    ctx,
+		},
+		auth: msg.auth,
+	}
+	rawAuthContentTBM, err := marshal(&authContentTBM)
+	if err != nil {
+		return false
+	}
+	return cs.verifyMAC(membershipKey, rawAuthContentTBM, msg.membershipTag)
+}
+
+type authenticatedContentTBM struct {
+	contentTBS framedContentTBS
+	auth       framedContentAuthData
+}
+
+func (tbm *authenticatedContentTBM) marshal(b *cryptobyte.Builder) {
+	tbm.contentTBS.marshal(b)
+	tbm.auth.marshal(b, tbm.contentTBS.content.contentType)
+}
 
 type privateMessage struct {
 	groupID             GroupID

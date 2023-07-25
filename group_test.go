@@ -107,7 +107,12 @@ func testMessageProtectionPub(t *testing.T, tc *messageProtectionTest, ctx *grou
 	if !pubMsg.auth.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), &framedContentTBS) {
 		t.Errorf("verifySignature() failed")
 	}
-	// TODO: check membership tag
+
+	if pubMsg.content.sender.senderType == senderTypeMember {
+		if !pubMsg.verifyMembershipTag(tc.CipherSuite, []byte(tc.MembershipKey), ctx) {
+			t.Errorf("verifyMembershipTag() failed")
+		}
+	}
 
 	var (
 		raw []byte
