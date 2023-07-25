@@ -679,6 +679,10 @@ func (tree ratchetTree) findParentHash(nodeIndices []nodeIndex, parentHash []byt
 	return false
 }
 
+func (tree ratchetTree) numLeaves() numLeaves {
+	return numLeavesFromWidth(uint32(len(tree)))
+}
+
 func (tree *ratchetTree) add(leafNode *leafNode) {
 	li := leafIndex(0)
 	var ni nodeIndex
@@ -702,7 +706,7 @@ func (tree *ratchetTree) add(leafNode *leafNode) {
 		}
 	}
 
-	numLeaves := numLeavesFromWidth(uint32(len(*tree)))
+	numLeaves := tree.numLeaves()
 	p := ni
 	for {
 		var ok bool
@@ -720,4 +724,24 @@ func (tree *ratchetTree) add(leafNode *leafNode) {
 		nodeType: nodeTypeLeaf,
 		leafNode: leafNode,
 	})
+}
+
+func (tree ratchetTree) update(li leafIndex, leafNode *leafNode) {
+	ni := li.nodeIndex()
+
+	tree.set(ni, &node{
+		nodeType: nodeTypeLeaf,
+		leafNode: leafNode,
+	})
+
+	numLeaves := tree.numLeaves()
+	for {
+		var ok bool
+		ni, ok = numLeaves.parent(ni)
+		if !ok {
+			break
+		}
+
+		tree.set(ni, nil)
+	}
 }

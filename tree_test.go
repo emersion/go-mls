@@ -77,7 +77,7 @@ func TestTreeValidation(t *testing.T) {
 type treeOperationsTest struct {
 	TreeBefore     testBytes `json:"tree_before"`
 	Proposal       testBytes `json:"proposal"`
-	ProposalSender uint32    `json:"proposal_sender"`
+	ProposalSender leafIndex `json:"proposal_sender"`
 
 	TreeAfter testBytes `json:"tree_after"`
 }
@@ -93,13 +93,18 @@ func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
 		t.Fatalf("unmarshal(proposal) = %v", err)
 	}
 
-	if prop.proposalType != proposalTypeAdd {
+	switch prop.proposalType {
+	case proposalTypeAdd:
+		// TODO: verify key package
+		tree.add(&prop.add.keyPackage.leafNode)
+	case proposalTypeUpdate:
+		// TODO: verify leaf node
+		tree.update(tc.ProposalSender, &prop.update.leafNode)
+	case proposalTypeRemove:
 		t.Skip("TODO")
+	default:
+		panic("unreachable")
 	}
-
-	// TODO: verify key package
-
-	tree.add(&prop.add.keyPackage.leafNode)
 
 	rawTree, err := marshal(&tree)
 	if err != nil {
