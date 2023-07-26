@@ -371,9 +371,9 @@ func (info *groupInfo) verifySignature(signerPub signaturePublicKey) bool {
 	return cs.verifyWithLabel([]byte(signerPub), []byte("GroupInfoTBS"), tbs, info.signature)
 }
 
-func (info *groupInfo) verifyConfirmationTag(joinerSecret []byte) bool {
+func (info *groupInfo) verifyConfirmationTag(joinerSecret, pskSecret []byte) bool {
 	cs := info.groupContext.cipherSuite
-	epochSecret, err := info.groupContext.extractEpochSecret(joinerSecret, nil)
+	epochSecret, err := info.groupContext.extractEpochSecret(joinerSecret, pskSecret)
 	if err != nil {
 		return false
 	}

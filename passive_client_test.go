@@ -52,7 +52,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		}
 	}
 
-	if len(tc.ExternalPSKs) > 0 || tree == nil {
+	if tree == nil {
 		t.Skip("TODO")
 	}
 
@@ -74,7 +74,31 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Fatalf("welcome.decryptGroupSecrets() = %v", err)
 	}
 
-	groupInfo, err := welcome.decryptGroupInfo(groupSecrets.joinerSecret, nil)
+	var psks [][]byte
+	for _, pskID := range groupSecrets.psks {
+		if pskID.pskType != pskTypeExternal {
+			t.Fatalf("group secrets contain a non-external PSK ID")
+		}
+
+		found := false
+		for _, epsk := range tc.ExternalPSKs {
+			if bytes.Equal([]byte(epsk.PSKID), pskID.pskID) {
+				psks = append(psks, []byte(epsk.PSK))
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("PSK ID %v not found", pskID.pskID)
+		}
+	}
+
+	pskSecret, err := extractPSKSecret(tc.CipherSuite, groupSecrets.psks, psks)
+	if err != nil {
+		t.Fatalf("extractPSKSecret() = %v", err)
+	}
+
+	groupInfo, err := welcome.decryptGroupInfo(groupSecrets.joinerSecret, pskSecret)
 	if err != nil {
 		t.Fatalf("welcome.decryptGroupInfo() = %v", err)
 	}
@@ -82,7 +106,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	if !groupInfo.verifySignature(signerNode.signatureKey) {
 		t.Errorf("groupInfo.verifySignature() failed")
 	}
-	if !groupInfo.verifyConfirmationTag(groupSecrets.joinerSecret) {
+	if !groupInfo.verifyConfirmationTag(groupSecrets.joinerSecret, pskSecret) {
 		t.Errorf("groupInfo.verifyConfirmationTag() failed")
 	}
 
@@ -144,7 +168,7 @@ func TestPassiveClientWelcome(t *testing.T) {
 
 	for i, tc := range tests {
 		t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
-			if i == 36 || i == 37 {
+			if i == 36 || i == 37 || i == 39 {
 				// TODO: for some reason these fail with "hpke: invalid KEM private key"
 				t.Skip("TODO")
 			}

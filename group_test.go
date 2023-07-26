@@ -50,7 +50,7 @@ func testWelcome(t *testing.T, tc *welcomeTest) {
 	if !groupInfo.verifySignature(signaturePublicKey(tc.SignerPub)) {
 		t.Errorf("groupInfo.verifySignature() failed")
 	}
-	if !groupInfo.verifyConfirmationTag(groupSecrets.joinerSecret) {
+	if !groupInfo.verifyConfirmationTag(groupSecrets.joinerSecret, nil) {
 		t.Errorf("groupInfo.verifyConfirmationTag() failed")
 	}
 }
