@@ -503,6 +503,8 @@ func (tree ratchetTree) marshal(b *cryptobyte.Builder) {
 }
 
 // get returns the node at the provided index.
+//
+// nil is returned for blank nodes. get panics if the index is out of range.
 func (tree ratchetTree) get(i nodeIndex) *node {
 	return tree[int(i)]
 }
