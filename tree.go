@@ -511,6 +511,17 @@ func (tree ratchetTree) set(i nodeIndex, node *node) {
 	tree[int(i)] = node
 }
 
+func (tree ratchetTree) getLeaf(li leafIndex) *leafNode {
+	node := tree.get(li.nodeIndex())
+	if node == nil {
+		return nil
+	}
+	if node.nodeType != nodeTypeLeaf {
+		panic("unreachable")
+	}
+	return node.leafNode
+}
+
 // resolve computes the resolution of a node.
 func (tree ratchetTree) resolve(x nodeIndex) []nodeIndex {
 	n := tree.get(x)

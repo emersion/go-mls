@@ -110,10 +110,10 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	if err != nil {
 		t.Fatalf("welcome.decryptGroupInfo() = %v", err)
 	}
-	signerNode := tree.get(groupInfo.signer.nodeIndex())
+	signerNode := tree.getLeaf(groupInfo.signer)
 	if signerNode == nil {
 		t.Errorf("signer node is blank")
-	} else if !groupInfo.verifySignature(signerNode.leafNode.signatureKey) {
+	} else if !groupInfo.verifySignature(signerNode.signatureKey) {
 		t.Errorf("groupInfo.verifySignature() failed")
 	}
 	if !groupInfo.verifyConfirmationTag(groupSecrets.joinerSecret, pskSecret) {
