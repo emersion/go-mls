@@ -630,6 +630,8 @@ func (tree ratchetTree) verifyIntegrity(ctx *groupContext) error {
 				var ok bool
 				if x, ok = numLeaves.parent(x); !ok {
 					return fmt.Errorf("mls: unmerged leaf %v is not a descendant of the parent node at index %v", unmergedLeaf, p)
+				} else if x == p {
+					break
 				}
 
 				intermediateNode := tree.get(x)
