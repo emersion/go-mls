@@ -808,6 +808,26 @@ func (tree ratchetTree) numLeaves() numLeaves {
 	return numLeavesFromWidth(uint32(len(tree)))
 }
 
+func (tree ratchetTree) findLeaf(node *leafNode) (leafIndex, bool) {
+	for li := leafIndex(0); li < leafIndex(tree.numLeaves()); li++ {
+		n := tree.getLeaf(li)
+		if n == nil {
+			continue
+		}
+
+		// Encryption keys are unique
+		if !bytes.Equal(n.encryptionKey, node.encryptionKey) {
+			continue
+		}
+
+		// Make sure both nodes are identical
+		raw1, err1 := marshal(node)
+		raw2, err2 := marshal(n)
+		return li, err1 == nil && err2 == nil && bytes.Equal(raw1, raw2)
+	}
+	return 0, false
+}
+
 func (tree *ratchetTree) add(leafNode *leafNode) {
 	li := leafIndex(0)
 	var ni nodeIndex

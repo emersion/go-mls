@@ -127,6 +127,11 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Errorf("tree.verifyIntegrity() = %v", err)
 	}
 
+	_, ok := tree.findLeaf(&keyPkg.leafNode)
+	if !ok {
+		t.Errorf("tree.findLeaf() = false")
+	}
+
 	// TODO: perform other group info verification steps
 	// TODO: verify epoch authenticator
 	// TODO: apply commits from epochs
