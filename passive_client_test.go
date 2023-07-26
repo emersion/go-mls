@@ -78,6 +78,10 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Fatalf("welcome.decryptGroupSecrets() = %v", err)
 	}
 
+	if !groupSecrets.verifySingleReinitOrBranchPSK() {
+		t.Errorf("groupSecrets.verifySingleReinitOrBranchPSK() failed")
+	}
+
 	var psks [][]byte
 	for _, pskID := range groupSecrets.psks {
 		if pskID.pskType != pskTypeExternal {

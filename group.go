@@ -436,6 +436,22 @@ func (sec *groupSecrets) marshal(b *cryptobyte.Builder) {
 	})
 }
 
+// verifySingleReInitOrBranchPSK verifies that at most one key has type
+// resumption with usage reinit or branch.
+func (sec *groupSecrets) verifySingleReinitOrBranchPSK() bool {
+	n := 0
+	for _, pskID := range sec.psks {
+		if pskID.pskType != pskTypeResumption {
+			continue
+		}
+		switch pskID.usage {
+		case resumptionPSKUsageReinit, resumptionPSKUsageBranch:
+			n++
+		}
+	}
+	return n <= 1
+}
+
 type welcome struct {
 	cipherSuite        cipherSuite
 	secrets            []encryptedGroupSecrets
