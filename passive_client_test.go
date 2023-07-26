@@ -123,14 +123,8 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Errorf("groupInfo.cipherSuite = %v, want %v", groupInfo.groupContext.cipherSuite, keyPkg.cipherSuite)
 	}
 
-	treeHash, err := tree.computeTreeHash(tc.CipherSuite, tree.numLeaves().root(), nil)
-	if err != nil {
-		t.Errorf("tree.computeTreeHash() = %v", err)
-	} else if !bytes.Equal(treeHash, groupInfo.groupContext.treeHash) {
-		t.Errorf("tree.computeTreeHash() = %v, want %v", treeHash, groupInfo.groupContext.treeHash)
-	}
-	if !tree.verifyParentHashes(tc.CipherSuite) {
-		t.Errorf("tree.verifyParentHashes() failed")
+	if err := tree.verifyIntegrity(&groupInfo.groupContext); err != nil {
+		t.Errorf("tree.verifyIntegrity() = %v", err)
 	}
 
 	// TODO: perform other group info verification steps

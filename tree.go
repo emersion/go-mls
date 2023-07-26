@@ -544,6 +544,118 @@ func (tree ratchetTree) resolve(x nodeIndex) []nodeIndex {
 	}
 }
 
+// verify the integrity of the ratchet tree, as described in section 12.4.3.1.
+//
+// This function does not perform full leaf node validation. In particular:
+//
+//   - It doesn't check that credentials are valid.
+//   - It doesn't check the lifetime field.
+func (tree ratchetTree) verifyIntegrity(ctx *groupContext) error {
+	cs := ctx.cipherSuite
+	numLeaves := tree.numLeaves()
+
+	if h, err := tree.computeTreeHash(cs, numLeaves.root(), nil); err != nil {
+		return err
+	} else if !bytes.Equal(h, ctx.treeHash) {
+		return fmt.Errorf("mls: tree hash verification failed")
+	}
+
+	if !tree.verifyParentHashes(cs) {
+		return fmt.Errorf("mls: parent hashes verification failed")
+	}
+
+	numMembers := 0
+	supportedCreds := make(map[credentialType]int)
+	for li := leafIndex(0); li < leafIndex(numLeaves); li++ {
+		node := tree.getLeaf(li)
+		if node == nil {
+			continue
+		}
+
+		numMembers++
+		for _, ct := range node.capabilities.credentials {
+			supportedCreds[ct]++
+		}
+	}
+
+	signatureKeys := make(map[string]struct{})
+	encryptionKeys := make(map[string]struct{})
+	for li := leafIndex(0); li < leafIndex(numLeaves); li++ {
+		node := tree.getLeaf(li)
+		if node == nil {
+			continue
+		}
+
+		if !node.verifySignature(cs, ctx.groupID, li) {
+			return fmt.Errorf("mls: signature verification failed for leaf node at index %v", li)
+		}
+
+		// TODO: check required_capabilities group extension
+
+		if supportedCreds[node.credential.credentialType] != numMembers {
+			return fmt.Errorf("mls: credential type %v used by leaf node at index %v not supported by all members", node.credential.credentialType, li)
+		}
+
+		// TODO: consider checking lifetime
+
+		supportedExts := make(map[extensionType]struct{})
+		for _, et := range node.capabilities.extensions {
+			supportedExts[et] = struct{}{}
+		}
+		for _, ext := range node.extensions {
+			if _, ok := supportedExts[ext.extensionType]; !ok {
+				return fmt.Errorf("mls: extension type %d used by leaf node at index %v not supported by that leaf node", ext.extensionType, li)
+			}
+		}
+
+		if _, dup := signatureKeys[string(node.signatureKey)]; dup {
+			return fmt.Errorf("mls: duplicate signature key in ratchet tree")
+		}
+		if _, dup := encryptionKeys[string(node.encryptionKey)]; dup {
+			return fmt.Errorf("mls: duplicate encryption key in ratchet tree")
+		}
+		signatureKeys[string(node.signatureKey)] = struct{}{}
+		encryptionKeys[string(node.encryptionKey)] = struct{}{}
+	}
+
+	for i, node := range tree {
+		if node == nil || node.nodeType != nodeTypeParent {
+			continue
+		}
+		p := nodeIndex(i)
+		for _, unmergedLeaf := range node.parentNode.unmergedLeaves {
+			x := unmergedLeaf.nodeIndex()
+			for {
+				var ok bool
+				if x, ok = numLeaves.parent(x); !ok {
+					return fmt.Errorf("mls: unmerged leaf %v is not a descendant of the parent node at index %v", unmergedLeaf, p)
+				}
+
+				intermediateNode := tree.get(x)
+				if intermediateNode != nil && !hasUnmergedLeaf(intermediateNode.parentNode, unmergedLeaf) {
+					return fmt.Errorf("mls: non-blank intermediate node at index %v is missing unmerged leaf %v", x, unmergedLeaf)
+				}
+			}
+		}
+
+		if _, dup := encryptionKeys[string(node.parentNode.encryptionKey)]; dup {
+			return fmt.Errorf("mls: duplicate encryption key in ratchet tree")
+		}
+		encryptionKeys[string(node.parentNode.encryptionKey)] = struct{}{}
+	}
+
+	return nil
+}
+
+func hasUnmergedLeaf(node *parentNode, unmergedLeaf leafIndex) bool {
+	for _, li := range node.unmergedLeaves {
+		if li == unmergedLeaf {
+			return true
+		}
+	}
+	return false
+}
+
 func (tree ratchetTree) computeTreeHash(cs cipherSuite, x nodeIndex, exclude map[leafIndex]struct{}) ([]byte, error) {
 	n := tree.get(x)
 
