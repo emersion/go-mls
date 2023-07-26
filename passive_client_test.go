@@ -133,7 +133,18 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	}
 
 	// TODO: perform other group info verification steps
-	// TODO: verify epoch authenticator
+
+	epochSecret, err := groupInfo.groupContext.extractEpochSecret(groupSecrets.joinerSecret, pskSecret)
+	if err != nil {
+		t.Fatalf("groupContext.extractEpochSecret() = %v", err)
+	}
+	epochAuthenticator, err := tc.CipherSuite.deriveSecret(epochSecret, secretLabelAuthentication)
+	if err != nil {
+		t.Errorf("deriveSecret(authentication) = %v", err)
+	} else if !bytes.Equal(epochAuthenticator, []byte(tc.InitialEpochAuthenticator)) {
+		t.Errorf("deriveSecret(authentication) = %v, want %v", epochAuthenticator, tc.InitialEpochAuthenticator)
+	}
+
 	// TODO: apply commits from epochs
 }
 
