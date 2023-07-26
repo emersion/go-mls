@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"time"
 
 	"golang.org/x/crypto/cryptobyte"
 )
@@ -177,6 +178,8 @@ func (caps *capabilities) marshal(b *cryptobyte.Builder) {
 	})
 }
 
+const maxLeafNodeLifetime = 3 * 30 * 24 * time.Hour
+
 type lifetime struct {
 	notBefore, notAfter uint64
 }
@@ -192,6 +195,27 @@ func (lt *lifetime) unmarshal(s *cryptobyte.String) error {
 func (lt *lifetime) marshal(b *cryptobyte.Builder) {
 	b.AddUint64(lt.notBefore)
 	b.AddUint64(lt.notAfter)
+}
+
+func (lt *lifetime) notBeforeTime() time.Time {
+	return time.Unix(int64(lt.notBefore), 0)
+}
+
+func (lt *lifetime) notAfterTime() time.Time {
+	return time.Unix(int64(lt.notAfter), 0)
+}
+
+// verify ensures that the lifetime is valid: it has an acceptable range and
+// the current time is within that range.
+func (lt *lifetime) verify() bool {
+	notBefore, notAfter := lt.notBeforeTime(), lt.notAfterTime()
+
+	if d := notAfter.Sub(notBefore); d <= 0 || d > maxLeafNodeLifetime {
+		return false
+	}
+
+	t := time.Now()
+	return t.After(notBefore) && notAfter.After(t)
 }
 
 type extensionType uint16
