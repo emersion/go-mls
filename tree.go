@@ -544,7 +544,8 @@ func (tree ratchetTree) resolve(x nodeIndex) []nodeIndex {
 	}
 }
 
-// verify the integrity of the ratchet tree, as described in section 12.4.3.1.
+// verifyIntegrity verifies the integrity of the ratchet tree, as described in
+// section 12.4.3.1.
 //
 // This function does not perform full leaf node validation. In particular:
 //
