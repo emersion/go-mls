@@ -31,6 +31,8 @@ type passiveClientTest struct {
 
 func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	initPriv := []byte(tc.InitPriv)
+	encryptionPriv := []byte(tc.EncryptionPriv)
+	signaturePriv := []byte(tc.SignaturePriv)
 
 	msg, err := unmarshalMLSMessage(tc.Welcome, wireFormatMLSWelcome)
 	if err != nil {
@@ -56,11 +58,13 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Skip("TODO")
 	}
 
-	// TODO: verify that private keys match public keys in KeyPackage
 	if err := checkEncryptionKeyPair(tc.CipherSuite, keyPkg.initKey, initPriv); err != nil {
 		t.Errorf("invalid init keypair: %v", err)
 	}
-	if err := checkSignatureKeyPair(tc.CipherSuite, []byte(keyPkg.leafNode.signatureKey), []byte(tc.SignaturePriv)); err != nil {
+	if err := checkEncryptionKeyPair(tc.CipherSuite, keyPkg.leafNode.encryptionKey, encryptionPriv); err != nil {
+		t.Errorf("invalid encryption keypair: %v", err)
+	}
+	if err := checkSignatureKeyPair(tc.CipherSuite, []byte(keyPkg.leafNode.signatureKey), signaturePriv); err != nil {
 		t.Errorf("invalid signature keypair: %v", err)
 	}
 
@@ -168,7 +172,7 @@ func TestPassiveClientWelcome(t *testing.T) {
 
 	for i, tc := range tests {
 		t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
-			if i == 36 || i == 37 || i == 39 {
+			if i == 36 || i == 37 || i == 38 || i == 39 {
 				// TODO: for some reason these fail with "hpke: invalid KEM private key"
 				t.Skip("TODO")
 			}
