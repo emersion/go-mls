@@ -119,6 +119,9 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	if !groupInfo.verifyConfirmationTag(groupSecrets.joinerSecret, pskSecret) {
 		t.Errorf("groupInfo.verifyConfirmationTag() failed")
 	}
+	if groupInfo.groupContext.cipherSuite != keyPkg.cipherSuite {
+		t.Errorf("groupInfo.cipherSuite = %v, want %v", groupInfo.groupContext.cipherSuite, keyPkg.cipherSuite)
+	}
 
 	// TODO: perform other group info verification steps
 	// TODO: verify epoch authenticator
