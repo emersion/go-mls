@@ -79,13 +79,24 @@ type treeOperationsTest struct {
 	Proposal       testBytes `json:"proposal"`
 	ProposalSender leafIndex `json:"proposal_sender"`
 
-	TreeAfter testBytes `json:"tree_after"`
+	TreeHashBefore testBytes `json:"tree_hash_before"`
+	TreeAfter      testBytes `json:"tree_after"`
+	TreeHashAfter  testBytes `json:"tree_hash_after"`
 }
 
 func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
+	cs := cipherSuiteMLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
+
 	var tree ratchetTree
 	if err := unmarshal([]byte(tc.TreeBefore), &tree); err != nil {
 		t.Fatalf("unmarshal(tree) = %v", err)
+	}
+
+	treeHash, err := tree.computeTreeHash(cs, tree.numLeaves().root(), nil)
+	if err != nil {
+		t.Errorf("ratchetTree.computeTreeHash() = %v", err)
+	} else if !bytes.Equal(treeHash, []byte(tc.TreeHashBefore)) {
+		t.Errorf("ratchetTree.computeTreeHash() = %v, want %v", treeHash, tc.TreeHashBefore)
 	}
 
 	var prop proposal
@@ -118,6 +129,13 @@ func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
 		t.Fatalf("marshal(tree) = %v", err)
 	} else if !bytes.Equal(rawTree, []byte(tc.TreeAfter)) {
 		t.Errorf("marshal(tree) = %v, want %v", rawTree, tc.TreeAfter)
+	}
+
+	treeHash, err = tree.computeTreeHash(cs, tree.numLeaves().root(), nil)
+	if err != nil {
+		t.Errorf("ratchetTree.computeTreeHash() = %v", err)
+	} else if !bytes.Equal(treeHash, []byte(tc.TreeHashAfter)) {
+		t.Errorf("ratchetTree.computeTreeHash() = %v, want %v", treeHash, tc.TreeHashAfter)
 	}
 }
 
