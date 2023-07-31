@@ -255,6 +255,15 @@ func marshalExtensionVec(b *cryptobyte.Builder, exts []extension) {
 	})
 }
 
+func findExtensionData(exts []extension, t extensionType) []byte {
+	for _, ext := range exts {
+		if ext.extensionType == t {
+			return ext.extensionData
+		}
+	}
+	return nil
+}
+
 type leafNode struct {
 	encryptionKey hpkePublicKey
 	signatureKey  signaturePublicKey

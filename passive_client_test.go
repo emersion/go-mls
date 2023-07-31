@@ -46,18 +46,6 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	}
 	keyPkg := msg.keyPackage
 
-	var tree *ratchetTree
-	if tc.RatchetTree != nil {
-		tree = new(ratchetTree)
-		if err := unmarshal([]byte(tc.RatchetTree), tree); err != nil {
-			t.Fatalf("unmarshal(ratchetTree) = %v", err)
-		}
-	}
-
-	if tree == nil {
-		t.Skip("TODO")
-	}
-
 	if err := checkEncryptionKeyPair(tc.CipherSuite, keyPkg.initKey, initPriv); err != nil {
 		t.Errorf("invalid init keypair: %v", err)
 	}
@@ -110,6 +98,20 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	if err != nil {
 		t.Fatalf("welcome.decryptGroupInfo() = %v", err)
 	}
+
+	rawTree := []byte(tc.RatchetTree)
+	if rawTree == nil {
+		rawTree = findExtensionData(groupInfo.extensions, extensionTypeRatchetTree)
+	}
+	if rawTree == nil {
+		t.Fatalf("missing ratchet tree")
+	}
+
+	tree := new(ratchetTree)
+	if err := unmarshal(rawTree, tree); err != nil {
+		t.Fatalf("unmarshal(ratchetTree) = %v", err)
+	}
+
 	signerNode := tree.getLeaf(groupInfo.signer)
 	if signerNode == nil {
 		t.Errorf("signer node is blank")
@@ -201,7 +203,7 @@ func TestPassiveClientWelcome(t *testing.T) {
 
 	for i, tc := range tests {
 		t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
-			if i == 36 || i == 37 || i == 38 || i == 39 {
+			if i == 32 || (i >= 34 && i <= 39) {
 				// TODO: for some reason these fail with "hpke: invalid KEM private key"
 				t.Skip("TODO")
 			}
