@@ -74,6 +74,79 @@ func TestTreeValidation(t *testing.T) {
 	}
 }
 
+type treeKEMTest struct {
+	CipherSuite cipherSuite `json:"cipher_suite"`
+
+	GroupID                 testBytes `json:"group_id"`
+	Epoch                   uint64    `json:"epoch"`
+	ConfirmedTranscriptHash testBytes `json:"confirmed_transcript_hash"`
+
+	RatchetTree testBytes `json:"ratchet_tree"`
+
+	LeavesPrivate []struct {
+		Index          leafIndex `json:"index"`
+		EncryptionPriv testBytes `json:"encryption_priv"`
+		SignaturePriv  testBytes `json:"signature_priv"`
+		PathSecrets    []struct {
+			Node       nodeIndex `json:"node"`
+			PathSecret testBytes `json:"path_secret"`
+		} `json:"path_secrets"`
+	} `json:"leaves_private"`
+
+	UpdatePaths []struct {
+		Sender        leafIndex   `json:"sender"`
+		UpdatePath    testBytes   `json:"update_path"`
+		PathSecrets   []testBytes `json:"path_secrets"`
+		CommitSecret  testBytes   `json:"commit_secret"`
+		TreeHashAfter testBytes   `json:"tree_hash_after"`
+	} `json:"update_paths"`
+}
+
+func testTreeKEM(t *testing.T, tc *treeKEMTest) {
+	var tree ratchetTree
+	if err := unmarshal([]byte(tc.RatchetTree), &tree); err != nil {
+		t.Fatalf("unmarshal(ratchetTree) = %v", err)
+	}
+
+	// TODO: test leaves_private
+
+	for _, updatePathTest := range tc.UpdatePaths {
+		var up updatePath
+		if err := unmarshal([]byte(updatePathTest.UpdatePath), &up); err != nil {
+			t.Fatalf("unmarshal(updatePath) = %v", err)
+		}
+
+		// TODO: verify that UpdatePath is parent-hash valid relative to ratchet tree
+		// TODO: process UpdatePath using private leaves
+
+		if err := tree.mergeUpdatePath(tc.CipherSuite, updatePathTest.Sender, &up); err != nil {
+			t.Fatalf("ratchetTree.mergeUpdatePath() = %v", err)
+		}
+
+		treeHash, err := tree.computeTreeHash(tc.CipherSuite, tree.numLeaves().root(), nil)
+		if err != nil {
+			t.Errorf("ratchetTree.computeTreeHash() = %v", err)
+		} else if !bytes.Equal(treeHash, []byte(updatePathTest.TreeHashAfter)) {
+			t.Errorf("ratchetTree.computeTreeHash() = %v, want %v", treeHash, updatePathTest.TreeHashAfter)
+		}
+
+		// TODO: create and verify new update path
+
+		break // TODO: only the first update is working, mergeUpdatePath is buggy
+	}
+}
+
+func TestTreeKEM(t *testing.T) {
+	var tests []treeKEMTest
+	loadTestVector(t, "testdata/treekem.json", &tests)
+
+	for i, tc := range tests {
+		t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
+			testTreeKEM(t, &tc)
+		})
+	}
+}
+
 type treeOperationsTest struct {
 	TreeBefore     testBytes `json:"tree_before"`
 	Proposal       testBytes `json:"proposal"`

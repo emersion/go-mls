@@ -964,3 +964,99 @@ func (tree *ratchetTree) remove(li leafIndex) {
 		*tree = (*tree)[:lastPowerOf2]
 	}
 }
+
+func (tree ratchetTree) filteredDirectPath(x nodeIndex) []nodeIndex {
+	numLeaves := tree.numLeaves()
+
+	var path []nodeIndex
+	for {
+		p, ok := numLeaves.parent(x)
+		if !ok {
+			break
+		}
+
+		s, ok := numLeaves.sibling(x)
+		if !ok {
+			panic("unreachable")
+		}
+
+		if len(tree.resolve(s)) > 0 {
+			path = append(path, p)
+		}
+
+		x = p
+	}
+
+	return path
+}
+
+func (tree ratchetTree) mergeUpdatePath(cs cipherSuite, senderLeafIndex leafIndex, path *updatePath) error {
+	senderNodeIndex := senderLeafIndex.nodeIndex()
+	numLeaves := tree.numLeaves()
+
+	directPath := numLeaves.directPath(senderNodeIndex)
+	for _, ni := range directPath {
+		tree.set(ni, nil)
+	}
+
+	filteredDirectPath := tree.filteredDirectPath(senderNodeIndex)
+	if len(filteredDirectPath) != len(path.nodes) {
+		return fmt.Errorf("mls: UpdatePath has %v nodes, but filtered direct path has %v nodes", len(path.nodes), len(filteredDirectPath))
+	}
+	for i, ni := range filteredDirectPath {
+		pathNode := path.nodes[i]
+		tree.set(ni, &node{
+			nodeType: nodeTypeParent,
+			parentNode: &parentNode{
+				encryptionKey: pathNode.encryptionKey,
+			},
+		})
+	}
+
+	// Compute parent hashes, from root to leaf
+	var prevParentHash []byte
+	for i := len(filteredDirectPath) - 1; i >= 0; i-- {
+		ni := filteredDirectPath[i]
+		node := tree.get(ni).parentNode
+
+		l, r, ok := ni.children()
+		if !ok {
+			panic("unreachable")
+		}
+
+		s := l
+		found := false
+		for _, ni := range directPath {
+			if ni == s {
+				found = true
+				break
+			}
+		}
+		if s == senderNodeIndex || found {
+			s = r
+		}
+
+		treeHash, err := tree.computeTreeHash(cs, s, nil)
+		if err != nil {
+			return err
+		}
+
+		node.parentHash = prevParentHash
+		h, err := node.computeParentHash(cs, treeHash)
+		if err != nil {
+			return err
+		}
+		prevParentHash = h
+	}
+
+	if !bytes.Equal(path.leafNode.parentHash, prevParentHash) {
+		return fmt.Errorf("mls: parent hash mismatch for update path's leaf node")
+	}
+
+	tree.set(senderNodeIndex, &node{
+		nodeType: nodeTypeLeaf,
+		leafNode: &path.leafNode,
+	})
+
+	return nil
+}
