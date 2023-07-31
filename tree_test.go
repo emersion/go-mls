@@ -118,7 +118,9 @@ func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
 		// TODO: verify leaf node
 		tree.update(tc.ProposalSender, &prop.update.leafNode)
 	case proposalTypeRemove:
-		// TODO: verify leaf index
+		if tree.getLeaf(prop.remove.removed) == nil {
+			t.Errorf("leaf node %v is blank", prop.remove.removed)
+		}
 		tree.remove(prop.remove.removed)
 	default:
 		panic("unreachable")
