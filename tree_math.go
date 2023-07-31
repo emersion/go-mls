@@ -71,11 +71,12 @@ func (n numLeaves) sibling(x nodeIndex) (nodeIndex, bool) {
 func (n numLeaves) directPath(x nodeIndex) []nodeIndex {
 	var path []nodeIndex
 	for {
-		x, ok := n.parent(x)
+		p, ok := n.parent(x)
 		if !ok {
 			break
 		}
-		path = append(path, x)
+		path = append(path, p)
+		x = p
 	}
 	return path
 }
