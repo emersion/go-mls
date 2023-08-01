@@ -107,8 +107,8 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Fatalf("missing ratchet tree")
 	}
 
-	tree := new(ratchetTree)
-	if err := unmarshal(rawTree, tree); err != nil {
+	var tree ratchetTree
+	if err := unmarshal(rawTree, &tree); err != nil {
 		t.Fatalf("unmarshal(ratchetTree) = %v", err)
 	}
 
