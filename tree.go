@@ -687,7 +687,7 @@ func (tree ratchetTree) verifyIntegrity(ctx *groupContext, now func() time.Time)
 	cs := ctx.cipherSuite
 	numLeaves := tree.numLeaves()
 
-	if h, err := tree.computeTreeHash(cs, numLeaves.root(), nil); err != nil {
+	if h, err := tree.computeRootTreeHash(cs); err != nil {
 		return err
 	} else if !bytes.Equal(h, ctx.treeHash) {
 		return fmt.Errorf("mls: tree hash verification failed")
@@ -761,6 +761,10 @@ func hasUnmergedLeaf(node *parentNode, unmergedLeaf leafIndex) bool {
 		}
 	}
 	return false
+}
+
+func (tree ratchetTree) computeRootTreeHash(cs cipherSuite) ([]byte, error) {
+	return tree.computeTreeHash(cs, tree.numLeaves().root(), nil)
 }
 
 func (tree ratchetTree) computeTreeHash(cs cipherSuite, x nodeIndex, exclude map[leafIndex]struct{}) ([]byte, error) {

@@ -124,11 +124,11 @@ func testTreeKEM(t *testing.T, tc *treeKEMTest) {
 			t.Fatalf("ratchetTree.mergeUpdatePath() = %v", err)
 		}
 
-		treeHash, err := tree.computeTreeHash(tc.CipherSuite, tree.numLeaves().root(), nil)
+		treeHash, err := tree.computeRootTreeHash(tc.CipherSuite)
 		if err != nil {
-			t.Errorf("ratchetTree.computeTreeHash() = %v", err)
+			t.Errorf("ratchetTree.computeRootTreeHash() = %v", err)
 		} else if !bytes.Equal(treeHash, []byte(updatePathTest.TreeHashAfter)) {
-			t.Errorf("ratchetTree.computeTreeHash() = %v, want %v", treeHash, updatePathTest.TreeHashAfter)
+			t.Errorf("ratchetTree.computeRootTreeHash() = %v, want %v", treeHash, updatePathTest.TreeHashAfter)
 		}
 
 		// TODO: create and verify new update path
@@ -164,11 +164,11 @@ func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
 		t.Fatalf("unmarshal(tree) = %v", err)
 	}
 
-	treeHash, err := tree.computeTreeHash(cs, tree.numLeaves().root(), nil)
+	treeHash, err := tree.computeRootTreeHash(cs)
 	if err != nil {
-		t.Errorf("ratchetTree.computeTreeHash() = %v", err)
+		t.Errorf("ratchetTree.computeRootTreeHash() = %v", err)
 	} else if !bytes.Equal(treeHash, []byte(tc.TreeHashBefore)) {
-		t.Errorf("ratchetTree.computeTreeHash() = %v, want %v", treeHash, tc.TreeHashBefore)
+		t.Errorf("ratchetTree.computeRootTreeHash() = %v, want %v", treeHash, tc.TreeHashBefore)
 	}
 
 	var prop proposal
@@ -217,11 +217,11 @@ func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
 		t.Errorf("marshal(tree) = %v, want %v", rawTree, tc.TreeAfter)
 	}
 
-	treeHash, err = tree.computeTreeHash(cs, tree.numLeaves().root(), nil)
+	treeHash, err = tree.computeRootTreeHash(cs)
 	if err != nil {
-		t.Errorf("ratchetTree.computeTreeHash() = %v", err)
+		t.Errorf("ratchetTree.computeRootTreeHash() = %v", err)
 	} else if !bytes.Equal(treeHash, []byte(tc.TreeHashAfter)) {
-		t.Errorf("ratchetTree.computeTreeHash() = %v, want %v", treeHash, tc.TreeHashAfter)
+		t.Errorf("ratchetTree.computeRootTreeHash() = %v, want %v", treeHash, tc.TreeHashAfter)
 	}
 }
 
