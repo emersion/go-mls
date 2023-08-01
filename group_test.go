@@ -102,7 +102,26 @@ func testMessageProtectionPub(t *testing.T, tc *messageProtectionTest, ctx *grou
 	}
 	pubMsg := msg.publicMessage
 
-	verifyPublicMessage(t, tc, ctx, pubMsg)
+	verifyPublicMessage(t, tc, ctx, pubMsg, wantRaw)
+
+	pubMsg, err := signPublicMessage(tc.CipherSuite, []byte(tc.SignaturePriv), &pubMsg.content, ctx)
+	if err != nil {
+		t.Errorf("signPublicMessage() = %v", err)
+	}
+	if err := pubMsg.signMembershipTag(tc.CipherSuite, []byte(tc.MembershipKey), ctx); err != nil {
+		t.Errorf("signMembershipTag() = %v", err)
+	}
+	verifyPublicMessage(t, tc, ctx, pubMsg, wantRaw)
+}
+
+func verifyPublicMessage(t *testing.T, tc *messageProtectionTest, ctx *groupContext, pubMsg *publicMessage, wantRaw []byte) {
+	authContent := pubMsg.authenticatedContent()
+	if !authContent.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), ctx) {
+		t.Errorf("verifySignature() failed")
+	}
+	if !pubMsg.verifyMembershipTag(tc.CipherSuite, []byte(tc.MembershipKey), ctx) {
+		t.Errorf("verifyMembershipTag() failed")
+	}
 
 	var (
 		raw []byte
@@ -122,25 +141,6 @@ func testMessageProtectionPub(t *testing.T, tc *messageProtectionTest, ctx *grou
 		t.Errorf("marshal() = %v", err)
 	} else if !bytes.Equal(raw, wantRaw) {
 		t.Errorf("marshal() = %v, want %v", raw, wantRaw)
-	}
-
-	pubMsg, err = signPublicMessage(tc.CipherSuite, []byte(tc.SignaturePriv), &pubMsg.content, ctx)
-	if err != nil {
-		t.Errorf("signPublicMessage() = %v", err)
-	}
-	if err := pubMsg.signMembershipTag(tc.CipherSuite, []byte(tc.MembershipKey), ctx); err != nil {
-		t.Errorf("signMembershipTag() = %v", err)
-	}
-	verifyPublicMessage(t, tc, ctx, pubMsg)
-}
-
-func verifyPublicMessage(t *testing.T, tc *messageProtectionTest, ctx *groupContext, pubMsg *publicMessage) {
-	authContent := pubMsg.authenticatedContent()
-	if !authContent.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), ctx) {
-		t.Errorf("verifySignature() failed")
-	}
-	if !pubMsg.verifyMembershipTag(tc.CipherSuite, []byte(tc.MembershipKey), ctx) {
-		t.Errorf("verifyMembershipTag() failed")
 	}
 }
 
@@ -165,24 +165,7 @@ func testMessageProtectionPriv(t *testing.T, tc *messageProtectionTest, ctx *gro
 		t.Fatalf("deriveRatchetRoot() = %v", err)
 	}
 
-	content := decryptPrivateMessage(t, tc, ctx, secret, privMsg)
-
-	var raw []byte
-	switch privMsg.contentType {
-	case contentTypeApplication:
-		raw = content.applicationData
-	case contentTypeProposal:
-		raw, err = marshal(content.proposal)
-	case contentTypeCommit:
-		raw, err = marshal(content.commit)
-	default:
-		t.Errorf("unexpected content type %v", privMsg.contentType)
-	}
-	if err != nil {
-		t.Errorf("marshal() = %v", err)
-	} else if !bytes.Equal(raw, wantRaw) {
-		t.Errorf("marshal() = %v, want %v", raw, wantRaw)
-	}
+	content := decryptPrivateMessage(t, tc, ctx, secret, privMsg, wantRaw)
 
 	senderData, err := newSenderData(li, 0) // TODO: set generation > 0
 	if err != nil {
@@ -204,10 +187,10 @@ func testMessageProtectionPriv(t *testing.T, tc *messageProtectionTest, ctx *gro
 	if err != nil {
 		t.Fatalf("encryptPrivateMessage() = %v", err)
 	}
-	decryptPrivateMessage(t, tc, ctx, secret, privMsg)
+	decryptPrivateMessage(t, tc, ctx, secret, privMsg, wantRaw)
 }
 
-func decryptPrivateMessage(t *testing.T, tc *messageProtectionTest, ctx *groupContext, secret ratchetSecret, privMsg *privateMessage) *privateMessageContent {
+func decryptPrivateMessage(t *testing.T, tc *messageProtectionTest, ctx *groupContext, secret ratchetSecret, privMsg *privateMessage, wantRaw []byte) *privateMessageContent {
 	senderData, err := privMsg.decryptSenderData(tc.CipherSuite, []byte(tc.SenderDataSecret))
 	if err != nil {
 		t.Fatalf("decryptSenderData() = %v", err)
@@ -228,6 +211,23 @@ func decryptPrivateMessage(t *testing.T, tc *messageProtectionTest, ctx *groupCo
 	authContent := privMsg.authenticatedContent(senderData, content)
 	if !authContent.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), ctx) {
 		t.Errorf("verifySignature() failed")
+	}
+
+	var raw []byte
+	switch privMsg.contentType {
+	case contentTypeApplication:
+		raw = content.applicationData
+	case contentTypeProposal:
+		raw, err = marshal(content.proposal)
+	case contentTypeCommit:
+		raw, err = marshal(content.commit)
+	default:
+		t.Errorf("unexpected content type %v", privMsg.contentType)
+	}
+	if err != nil {
+		t.Errorf("marshal() = %v", err)
+	} else if !bytes.Equal(raw, wantRaw) {
+		t.Errorf("marshal() = %v, want %v", raw, wantRaw)
 	}
 
 	return content
