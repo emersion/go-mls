@@ -409,7 +409,7 @@ func proposalListNeedsPath(proposals []proposal) bool {
 
 	for _, prop := range proposals {
 		switch prop.proposalType {
-		case proposalTypeUpdate, proposalTypeRemove:
+		case proposalTypeUpdate, proposalTypeRemove, proposalTypeExternalInit, proposalTypeGroupContextExtensions:
 			return true
 		}
 	}
