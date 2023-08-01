@@ -402,6 +402,21 @@ func verifyProposalList(proposals []proposal, senders []leafIndex, committer lea
 	return nil
 }
 
+func proposalListNeedsPath(proposals []proposal) bool {
+	if len(proposals) == 0 {
+		return true
+	}
+
+	for _, prop := range proposals {
+		switch prop.proposalType {
+		case proposalTypeUpdate, proposalTypeRemove:
+			return true
+		}
+	}
+
+	return false
+}
+
 type groupInfo struct {
 	groupContext    groupContext
 	extensions      []extension

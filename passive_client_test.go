@@ -209,6 +209,10 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		copy(newTree, tree)
 		newTree.apply(proposals, senders)
 
+		if proposalListNeedsPath(proposals) && commit.path == nil {
+			t.Errorf("proposal list needs update path")
+		}
+
 		break // TODO: apply commit
 	}
 }
