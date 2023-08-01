@@ -104,8 +104,8 @@ func testMessageProtectionPub(t *testing.T, tc *messageProtectionTest, ctx *grou
 	}
 	pubMsg := msg.publicMessage
 
-	framedContentTBS := pubMsg.framedContentTBS(ctx)
-	if !pubMsg.auth.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), framedContentTBS) {
+	authContent := pubMsg.authenticatedContent()
+	if !authContent.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), ctx) {
 		t.Errorf("verifySignature() failed")
 	}
 
@@ -175,8 +175,8 @@ func testMessageProtectionPriv(t *testing.T, tc *messageProtectionTest, ctx *gro
 		t.Fatalf("decryptContent() = %v", err)
 	}
 
-	framedContentTBS := newPrivateFramedContentTBS(privMsg, senderData, content, ctx)
-	if !content.auth.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), framedContentTBS) {
+	authContent := privMsg.authenticatedContent(senderData, content)
+	if !authContent.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), ctx) {
 		t.Errorf("verifySignature() failed")
 	}
 

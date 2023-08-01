@@ -280,6 +280,19 @@ func (authContent *authenticatedContent) confirmedTranscriptHashInput() *confirm
 	}
 }
 
+func (authContent *authenticatedContent) framedContentTBS(ctx *groupContext) *framedContentTBS {
+	return &framedContentTBS{
+		version:    protocolVersionMLS10,
+		wireFormat: authContent.wireFormat,
+		content:    authContent.content,
+		context:    ctx,
+	}
+}
+
+func (authContent *authenticatedContent) verifySignature(cs cipherSuite, verifKey []byte, ctx *groupContext) bool {
+	return authContent.auth.verifySignature(cs, verifKey, authContent.framedContentTBS(ctx))
+}
+
 type framedContentAuthData struct {
 	signature       []byte
 	confirmationTag []byte // for contentTypeCommit
@@ -375,12 +388,11 @@ func (msg *publicMessage) marshal(b *cryptobyte.Builder) {
 	}
 }
 
-func (msg *publicMessage) framedContentTBS(ctx *groupContext) *framedContentTBS {
-	return &framedContentTBS{
-		version:    protocolVersionMLS10,
+func (msg *publicMessage) authenticatedContent() *authenticatedContent {
+	return &authenticatedContent{
 		wireFormat: wireFormatMLSPublicMessage,
 		content:    msg.content,
-		context:    ctx,
+		auth:       msg.auth,
 	}
 }
 
@@ -389,7 +401,7 @@ func (msg *publicMessage) verifyMembershipTag(cs cipherSuite, membershipKey []by
 		return false
 	}
 	authContentTBM := authenticatedContentTBM{
-		contentTBS: *msg.framedContentTBS(ctx),
+		contentTBS: *msg.authenticatedContent().framedContentTBS(ctx),
 		auth:       msg.auth,
 	}
 	rawAuthContentTBM, err := marshal(&authContentTBM)
@@ -525,6 +537,26 @@ func (msg *privateMessage) decryptContent(cs cipherSuite, secret ratchetSecret, 
 	return &content, nil
 }
 
+func (msg *privateMessage) authenticatedContent(senderData *senderData, content *privateMessageContent) *authenticatedContent {
+	return &authenticatedContent{
+		wireFormat: wireFormatMLSPrivateMessage,
+		content: framedContent{
+			groupID: msg.groupID,
+			epoch:   msg.epoch,
+			sender: sender{
+				senderType: senderTypeMember,
+				leafIndex:  senderData.leafIndex,
+			},
+			authenticatedData: msg.authenticatedData,
+			contentType:       msg.contentType,
+			applicationData:   content.applicationData,
+			proposal:          content.proposal,
+			commit:            content.commit,
+		},
+		auth: content.auth,
+	}
+}
+
 type senderDataAAD privateMessage
 
 func (aad *senderDataAAD) marshal(b *cryptobyte.Builder) {
@@ -573,28 +605,6 @@ func (content *privateMessageContent) unmarshal(s *cryptobyte.String, ct content
 	}
 
 	return content.auth.unmarshal(s, ct)
-}
-
-func newPrivateFramedContentTBS(msg *privateMessage, senderData *senderData, content *privateMessageContent, ctx *groupContext) *framedContentTBS {
-	return &framedContentTBS{
-		version:    protocolVersionMLS10,
-		wireFormat: wireFormatMLSPrivateMessage,
-		content: framedContent{
-			groupID: msg.groupID,
-			epoch:   msg.epoch,
-			sender: sender{
-				senderType: senderTypeMember,
-				leafIndex:  senderData.leafIndex,
-			},
-			authenticatedData: msg.authenticatedData,
-
-			contentType:     msg.contentType,
-			applicationData: content.applicationData,
-			proposal:        content.proposal,
-			commit:          content.commit,
-		},
-		context: ctx,
-	}
 }
 
 type senderData struct {
