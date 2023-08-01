@@ -259,6 +259,20 @@ type authenticatedContent struct {
 	auth       framedContentAuthData
 }
 
+func signAuthenticatedContent(cs cipherSuite, signKey []byte, wf wireFormat, content *framedContent, ctx *groupContext) (*authenticatedContent, error) {
+	authContent := authenticatedContent{
+		wireFormat: wf,
+		content:    *content,
+	}
+	tbs := authContent.framedContentTBS(ctx)
+	signature, err := signFramedContent(cs, signKey, tbs)
+	if err != nil {
+		return nil, err
+	}
+	authContent.auth.signature = signature
+	return &authContent, nil
+}
+
 func (authContent *authenticatedContent) unmarshal(s *cryptobyte.String) error {
 	if err := authContent.wireFormat.unmarshal(s); err != nil {
 		return err
@@ -337,6 +351,14 @@ func (authData *framedContentAuthData) verifySignature(cs cipherSuite, verifKey 
 	return cs.verifyWithLabel(verifKey, []byte("FramedContentTBS"), rawContent, authData.signature)
 }
 
+func signFramedContent(cs cipherSuite, signKey []byte, content *framedContentTBS) ([]byte, error) {
+	rawContent, err := marshal(content)
+	if err != nil {
+		return nil, err
+	}
+	return cs.signWithLabel(signKey, []byte("FramedContentTBS"), rawContent)
+}
+
 type framedContentTBS struct {
 	version    protocolVersion
 	wireFormat wireFormat
@@ -358,6 +380,17 @@ type publicMessage struct {
 	content       framedContent
 	auth          framedContentAuthData
 	membershipTag []byte // for senderTypeMember
+}
+
+func signPublicMessage(cs cipherSuite, signKey []byte, content *framedContent, ctx *groupContext) (*publicMessage, error) {
+	authContent, err := signAuthenticatedContent(cs, signKey, wireFormatMLSPublicMessage, content, ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &publicMessage{
+		content: authContent.content,
+		auth:    authContent.auth,
+	}, nil
 }
 
 func (msg *publicMessage) unmarshal(s *cryptobyte.String) error {
@@ -396,15 +429,30 @@ func (msg *publicMessage) authenticatedContent() *authenticatedContent {
 	}
 }
 
+func (msg *publicMessage) authenticatedContentTBM(ctx *groupContext) *authenticatedContentTBM {
+	return &authenticatedContentTBM{
+		contentTBS: *msg.authenticatedContent().framedContentTBS(ctx),
+		auth:       msg.auth,
+	}
+}
+
+func (msg *publicMessage) signMembershipTag(cs cipherSuite, membershipKey []byte, ctx *groupContext) error {
+	if msg.content.sender.senderType != senderTypeMember {
+		return nil
+	}
+	rawAuthContentTBM, err := marshal(msg.authenticatedContentTBM(ctx))
+	if err != nil {
+		return err
+	}
+	msg.membershipTag = cs.signMAC(membershipKey, rawAuthContentTBM)
+	return nil
+}
+
 func (msg *publicMessage) verifyMembershipTag(cs cipherSuite, membershipKey []byte, ctx *groupContext) bool {
 	if msg.content.sender.senderType != senderTypeMember {
 		return true // there is no membership tag
 	}
-	authContentTBM := authenticatedContentTBM{
-		contentTBS: *msg.authenticatedContent().framedContentTBS(ctx),
-		auth:       msg.auth,
-	}
-	rawAuthContentTBM, err := marshal(&authContentTBM)
+	rawAuthContentTBM, err := marshal(msg.authenticatedContentTBM(ctx))
 	if err != nil {
 		return false
 	}

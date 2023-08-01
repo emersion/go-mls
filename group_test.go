@@ -94,8 +94,6 @@ type messageProtectionTest struct {
 }
 
 func testMessageProtectionPub(t *testing.T, tc *messageProtectionTest, ctx *groupContext, wantRaw, rawPub []byte) {
-	// TODO: test roundtrip
-
 	var msg mlsMessage
 	if err := unmarshal(rawPub, &msg); err != nil {
 		t.Fatalf("unmarshal() = %v", err)
@@ -104,13 +102,7 @@ func testMessageProtectionPub(t *testing.T, tc *messageProtectionTest, ctx *grou
 	}
 	pubMsg := msg.publicMessage
 
-	authContent := pubMsg.authenticatedContent()
-	if !authContent.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), ctx) {
-		t.Errorf("verifySignature() failed")
-	}
-	if !pubMsg.verifyMembershipTag(tc.CipherSuite, []byte(tc.MembershipKey), ctx) {
-		t.Errorf("verifyMembershipTag() failed")
-	}
+	verifyPublicMessage(t, tc, ctx, pubMsg)
 
 	var (
 		raw []byte
@@ -130,6 +122,25 @@ func testMessageProtectionPub(t *testing.T, tc *messageProtectionTest, ctx *grou
 		t.Errorf("marshal() = %v", err)
 	} else if !bytes.Equal(raw, wantRaw) {
 		t.Errorf("marshal() = %v, want %v", raw, wantRaw)
+	}
+
+	pubMsg, err = signPublicMessage(tc.CipherSuite, []byte(tc.SignaturePriv), &pubMsg.content, ctx)
+	if err != nil {
+		t.Errorf("signPublicMessage() = %v", err)
+	}
+	if err := pubMsg.signMembershipTag(tc.CipherSuite, []byte(tc.MembershipKey), ctx); err != nil {
+		t.Errorf("signMembershipTag() = %v", err)
+	}
+	verifyPublicMessage(t, tc, ctx, pubMsg)
+}
+
+func verifyPublicMessage(t *testing.T, tc *messageProtectionTest, ctx *groupContext, pubMsg *publicMessage) {
+	authContent := pubMsg.authenticatedContent()
+	if !authContent.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), ctx) {
+		t.Errorf("verifySignature() failed")
+	}
+	if !pubMsg.verifyMembershipTag(tc.CipherSuite, []byte(tc.MembershipKey), ctx) {
+		t.Errorf("verifyMembershipTag() failed")
 	}
 }
 
