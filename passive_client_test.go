@@ -165,8 +165,9 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		if pubMsg.content.sender.senderType != senderTypeMember {
 			t.Fatalf("TODO: senderType = %v", pubMsg.content.sender.senderType)
 		}
+		senderLeafIndex := pubMsg.content.sender.leafIndex
 		// TODO: check tree length
-		senderNode := tree.getLeaf(pubMsg.content.sender.leafIndex)
+		senderNode := tree.getLeaf(senderLeafIndex)
 		if senderNode == nil {
 			t.Fatalf("blank leaf node for sender")
 		}
@@ -190,13 +191,13 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 			switch propOrRef.typ {
 			case proposalOrRefTypeProposal:
 				proposals = append(proposals, *propOrRef.proposal)
-				senders = append(senders, pubMsg.content.sender.leafIndex)
+				senders = append(senders, senderLeafIndex)
 			case proposalOrRefTypeReference:
 				t.Error("TODO: proposalOrRefTypeReference")
 			}
 		}
 
-		if err := verifyProposalList(proposals, senders, pubMsg.content.sender.leafIndex); err != nil {
+		if err := verifyProposalList(proposals, senders, senderLeafIndex); err != nil {
 			t.Errorf("verifyProposals() = %v", err)
 		}
 		// TODO: additional proposal list checks
@@ -213,6 +214,12 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 
 		if proposalListNeedsPath(proposals) && commit.path == nil {
 			t.Errorf("proposal list needs update path")
+		}
+
+		if commit.path != nil {
+			if err := tree.mergeUpdatePath(tc.CipherSuite, senderLeafIndex, commit.path); err != nil {
+				t.Errorf("ratchetTree.mergeUpdatePath() = %v", err)
+			}
 		}
 
 		break // TODO: apply commit
