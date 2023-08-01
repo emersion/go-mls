@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 )
 
 type treeValidationTest struct {
@@ -186,7 +187,19 @@ func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
 		}
 		tree.add(&prop.add.keyPackage.leafNode)
 	case proposalTypeUpdate:
-		// TODO: verify leaf node
+		signatureKeys, encryptionKeys := tree.keys()
+		err := prop.update.leafNode.verify(&leafNodeVerifyOptions{
+			cipherSuite:    cs,
+			groupID:        nil,
+			leafIndex:      tc.ProposalSender,
+			supportedCreds: tree.supportedCreds(),
+			signatureKeys:  signatureKeys,
+			encryptionKeys: encryptionKeys,
+			now:            func() time.Time { return time.Time{} },
+		})
+		if err != nil {
+			t.Errorf("leafNode.verify() = %v", err)
+		}
 		tree.update(tc.ProposalSender, &prop.update.leafNode)
 	case proposalTypeRemove:
 		if tree.getLeaf(prop.remove.removed) == nil {

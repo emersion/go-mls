@@ -358,6 +358,10 @@ func (node *leafNodeTBS) marshal(b *cryptobyte.Builder) {
 	}
 }
 
+// verifySignature verifies the signature of the leaf node.
+//
+// groupID and li can be left unspecified if the leaf node source is neither
+// update nor commit.
 func (node *leafNode) verifySignature(cs cipherSuite, groupID GroupID, li leafIndex) bool {
 	leafNodeTBS, err := marshal(&leafNodeTBS{
 		leafNode:  node,
@@ -634,11 +638,9 @@ func (tree ratchetTree) resolve(x nodeIndex) []nodeIndex {
 }
 
 func (tree ratchetTree) supportedCreds() map[credentialType]struct{} {
-	numLeaves := tree.numLeaves()
-
 	numMembers := 0
 	supportedCredsCount := make(map[credentialType]int)
-	for li := leafIndex(0); li < leafIndex(numLeaves); li++ {
+	for li := leafIndex(0); li < leafIndex(tree.numLeaves()); li++ {
 		node := tree.getLeaf(li)
 		if node == nil {
 			continue
@@ -658,6 +660,20 @@ func (tree ratchetTree) supportedCreds() map[credentialType]struct{} {
 	}
 
 	return supportedCreds
+}
+
+func (tree ratchetTree) keys() (signatureKeys, encryptionKeys map[string]struct{}) {
+	signatureKeys = make(map[string]struct{})
+	encryptionKeys = make(map[string]struct{})
+	for li := leafIndex(0); li < leafIndex(tree.numLeaves()); li++ {
+		node := tree.getLeaf(li)
+		if node == nil {
+			continue
+		}
+		signatureKeys[string(node.signatureKey)] = struct{}{}
+		encryptionKeys[string(node.encryptionKey)] = struct{}{}
+	}
+	return signatureKeys, encryptionKeys
 }
 
 // verifyIntegrity verifies the integrity of the ratchet tree, as described in
