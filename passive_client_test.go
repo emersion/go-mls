@@ -176,7 +176,13 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		if !authContent.verifySignature(tc.CipherSuite, []byte(senderNode.signatureKey), &groupInfo.groupContext) {
 			t.Errorf("verifySignature() failed")
 		}
-		// TODO: check membership key
+
+		membershipKey, err := tc.CipherSuite.deriveSecret(epochSecret, secretLabelMembership)
+		if err != nil {
+			t.Errorf("deriveSecret(membership) = %v", err)
+		} else if !pubMsg.verifyMembershipTag(tc.CipherSuite, membershipKey, &groupInfo.groupContext) {
+			t.Errorf("publicMessage.verifyMembershipTag() failed")
+		}
 
 		if authContent.content.contentType != contentTypeCommit {
 			t.Errorf("contentType = %v, want %v", authContent.content.contentType, contentTypeCommit)
