@@ -334,7 +334,7 @@ func (c *commit) marshal(b *cryptobyte.Builder) {
 //
 // It does not perform all checks:
 //
-//   - It does not check whether proposal signatures and epochs are valid.
+//   - It does not check the validity of individual proposals (section 12.1).
 //   - It does not check whether members in add proposals are already part of
 //     the group.
 //   - It does not check whether non-default proposal types are supported by
