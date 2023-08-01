@@ -633,26 +633,8 @@ func (tree ratchetTree) resolve(x nodeIndex) []nodeIndex {
 	}
 }
 
-// verifyIntegrity verifies the integrity of the ratchet tree, as described in
-// section 12.4.3.1.
-//
-// This function does not perform full leaf node validation. In particular:
-//
-//   - It doesn't check that credentials are valid.
-//   - It doesn't check the lifetime field.
-func (tree ratchetTree) verifyIntegrity(ctx *groupContext, now func() time.Time) error {
-	cs := ctx.cipherSuite
+func (tree ratchetTree) supportedCreds() map[credentialType]struct{} {
 	numLeaves := tree.numLeaves()
-
-	if h, err := tree.computeTreeHash(cs, numLeaves.root(), nil); err != nil {
-		return err
-	} else if !bytes.Equal(h, ctx.treeHash) {
-		return fmt.Errorf("mls: tree hash verification failed")
-	}
-
-	if !tree.verifyParentHashes(cs) {
-		return fmt.Errorf("mls: parent hashes verification failed")
-	}
 
 	numMembers := 0
 	supportedCredsCount := make(map[credentialType]int)
@@ -675,6 +657,31 @@ func (tree ratchetTree) verifyIntegrity(ctx *groupContext, now func() time.Time)
 		}
 	}
 
+	return supportedCreds
+}
+
+// verifyIntegrity verifies the integrity of the ratchet tree, as described in
+// section 12.4.3.1.
+//
+// This function does not perform full leaf node validation. In particular:
+//
+//   - It doesn't check that credentials are valid.
+//   - It doesn't check the lifetime field.
+func (tree ratchetTree) verifyIntegrity(ctx *groupContext, now func() time.Time) error {
+	cs := ctx.cipherSuite
+	numLeaves := tree.numLeaves()
+
+	if h, err := tree.computeTreeHash(cs, numLeaves.root(), nil); err != nil {
+		return err
+	} else if !bytes.Equal(h, ctx.treeHash) {
+		return fmt.Errorf("mls: tree hash verification failed")
+	}
+
+	if !tree.verifyParentHashes(cs) {
+		return fmt.Errorf("mls: parent hashes verification failed")
+	}
+
+	supportedCreds := tree.supportedCreds()
 	signatureKeys := make(map[string]struct{})
 	encryptionKeys := make(map[string]struct{})
 	for li := leafIndex(0); li < leafIndex(numLeaves); li++ {
