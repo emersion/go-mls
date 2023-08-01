@@ -371,6 +371,55 @@ func (node *leafNode) verifySignature(cs cipherSuite, groupID GroupID, li leafIn
 	return cs.verifyWithLabel([]byte(node.signatureKey), []byte("LeafNodeTBS"), leafNodeTBS, node.signature)
 }
 
+// verify performs leaf node validation described in section 7.3.
+//
+// It does not perform all checks:
+//
+//   - It does not check that the credential is valid.
+func (node *leafNode) verify(options *leafNodeVerifyOptions) error {
+	li := options.leafIndex
+
+	if !node.verifySignature(options.cipherSuite, options.groupID, li) {
+		return fmt.Errorf("mls: leaf node signature verification failed")
+	}
+
+	// TODO: check required_capabilities group extension
+
+	if _, ok := options.supportedCreds[node.credential.credentialType]; !ok {
+		return fmt.Errorf("mls: credential type %v used by leaf node not supported by all members", node.credential.credentialType)
+	}
+
+	// TODO: consider checking lifetime
+
+	supportedExts := make(map[extensionType]struct{})
+	for _, et := range node.capabilities.extensions {
+		supportedExts[et] = struct{}{}
+	}
+	for _, ext := range node.extensions {
+		if _, ok := supportedExts[ext.extensionType]; !ok {
+			return fmt.Errorf("mls: extension type %d used by leaf node not supported by that leaf node", ext.extensionType)
+		}
+	}
+
+	if _, dup := options.signatureKeys[string(node.signatureKey)]; dup {
+		return fmt.Errorf("mls: duplicate signature key in ratchet tree")
+	}
+	if _, dup := options.encryptionKeys[string(node.encryptionKey)]; dup {
+		return fmt.Errorf("mls: duplicate encryption key in ratchet tree")
+	}
+
+	return nil
+}
+
+type leafNodeVerifyOptions struct {
+	cipherSuite    cipherSuite
+	groupID        GroupID
+	leafIndex      leafIndex
+	supportedCreds map[credentialType]struct{}
+	signatureKeys  map[string]struct{}
+	encryptionKeys map[string]struct{}
+}
+
 type updatePathNode struct {
 	encryptionKey       hpkePublicKey
 	encryptedPathSecret []hpkeCiphertext
@@ -599,7 +648,7 @@ func (tree ratchetTree) verifyIntegrity(ctx *groupContext) error {
 	}
 
 	numMembers := 0
-	supportedCreds := make(map[credentialType]int)
+	supportedCredsCount := make(map[credentialType]int)
 	for li := leafIndex(0); li < leafIndex(numLeaves); li++ {
 		node := tree.getLeaf(li)
 		if node == nil {
@@ -608,7 +657,14 @@ func (tree ratchetTree) verifyIntegrity(ctx *groupContext) error {
 
 		numMembers++
 		for _, ct := range node.capabilities.credentials {
-			supportedCreds[ct]++
+			supportedCredsCount[ct]++
+		}
+	}
+
+	supportedCreds := make(map[credentialType]struct{})
+	for ct, n := range supportedCredsCount {
+		if n == numMembers {
+			supportedCreds[ct] = struct{}{}
 		}
 	}
 
@@ -620,34 +676,18 @@ func (tree ratchetTree) verifyIntegrity(ctx *groupContext) error {
 			continue
 		}
 
-		if !node.verifySignature(cs, ctx.groupID, li) {
-			return fmt.Errorf("mls: signature verification failed for leaf node at index %v", li)
+		err := node.verify(&leafNodeVerifyOptions{
+			cipherSuite:    cs,
+			groupID:        ctx.groupID,
+			leafIndex:      li,
+			supportedCreds: supportedCreds,
+			signatureKeys:  signatureKeys,
+			encryptionKeys: encryptionKeys,
+		})
+		if err != nil {
+			return fmt.Errorf("leaf node at index %v: %v", li, err)
 		}
 
-		// TODO: check required_capabilities group extension
-
-		if supportedCreds[node.credential.credentialType] != numMembers {
-			return fmt.Errorf("mls: credential type %v used by leaf node at index %v not supported by all members", node.credential.credentialType, li)
-		}
-
-		// TODO: consider checking lifetime
-
-		supportedExts := make(map[extensionType]struct{})
-		for _, et := range node.capabilities.extensions {
-			supportedExts[et] = struct{}{}
-		}
-		for _, ext := range node.extensions {
-			if _, ok := supportedExts[ext.extensionType]; !ok {
-				return fmt.Errorf("mls: extension type %d used by leaf node at index %v not supported by that leaf node", ext.extensionType, li)
-			}
-		}
-
-		if _, dup := signatureKeys[string(node.signatureKey)]; dup {
-			return fmt.Errorf("mls: duplicate signature key in ratchet tree")
-		}
-		if _, dup := encryptionKeys[string(node.encryptionKey)]; dup {
-			return fmt.Errorf("mls: duplicate encryption key in ratchet tree")
-		}
 		signatureKeys[string(node.signatureKey)] = struct{}{}
 		encryptionKeys[string(node.encryptionKey)] = struct{}{}
 	}
