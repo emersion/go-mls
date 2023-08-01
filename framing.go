@@ -398,7 +398,7 @@ func (msg *publicMessage) authenticatedContent() *authenticatedContent {
 
 func (msg *publicMessage) verifyMembershipTag(cs cipherSuite, membershipKey []byte, ctx *groupContext) bool {
 	if msg.content.sender.senderType != senderTypeMember {
-		return false
+		return true // there is no membership tag
 	}
 	authContentTBM := authenticatedContentTBM{
 		contentTBS: *msg.authenticatedContent().framedContentTBS(ctx),
