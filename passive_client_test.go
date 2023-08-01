@@ -147,7 +147,66 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Errorf("deriveSecret(authentication) = %v, want %v", epochAuthenticator, tc.InitialEpochAuthenticator)
 	}
 
-	// TODO: apply commits from epochs
+	for _, epoch := range tc.Epochs {
+		var msg mlsMessage
+		if err := unmarshal([]byte(epoch.Commit), &msg); err != nil {
+			t.Fatalf("unmarshal(commit) = %v", err)
+		} else if msg.wireFormat != wireFormatMLSPublicMessage {
+			t.Fatalf("TODO: wireFormat = %v", msg.wireFormat)
+		}
+		pubMsg := msg.publicMessage
+
+		if pubMsg.content.epoch != groupInfo.groupContext.epoch {
+			t.Errorf("epoch = %v, want %v", pubMsg.content.epoch, groupInfo.groupContext.epoch)
+		}
+
+		if pubMsg.content.sender.senderType != senderTypeMember {
+			t.Fatalf("TODO: senderType = %v", pubMsg.content.sender.senderType)
+		}
+		// TODO: check tree length
+		senderNode := tree.getLeaf(pubMsg.content.sender.leafIndex)
+		if senderNode == nil {
+			t.Fatalf("blank leaf node for sender")
+		}
+
+		authContent := pubMsg.authenticatedContent()
+		if !authContent.verifySignature(tc.CipherSuite, []byte(senderNode.signatureKey), &groupInfo.groupContext) {
+			t.Errorf("verifySignature() failed")
+		}
+		// TODO: check membership key
+
+		if authContent.content.contentType != contentTypeCommit {
+			t.Errorf("contentType = %v, want %v", authContent.content.contentType, contentTypeCommit)
+		}
+		commit := authContent.content.commit
+
+		var (
+			proposals []proposal
+			senders   []leafIndex
+		)
+		for _, propOrRef := range commit.proposals {
+			switch propOrRef.typ {
+			case proposalOrRefTypeProposal:
+				proposals = append(proposals, *propOrRef.proposal)
+				senders = append(senders, pubMsg.content.sender.leafIndex)
+			case proposalOrRefTypeReference:
+				t.Error("TODO: proposalOrRefTypeReference")
+			}
+		}
+
+		if err := verifyProposalList(proposals, senders, pubMsg.content.sender.leafIndex); err != nil {
+			t.Errorf("verifyProposals() = %v", err)
+		}
+		// TODO: additional proposal list checks
+
+		for _, prop := range proposals {
+			if prop.proposalType == proposalTypePSK {
+				t.Fatalf("no PSK available")
+			}
+		}
+
+		break // TODO: apply commit
+	}
 }
 
 func unmarshalMLSMessage(raw testBytes, wf wireFormat) (*mlsMessage, error) {
@@ -207,6 +266,17 @@ func TestPassiveClientWelcome(t *testing.T) {
 				// TODO: for some reason these fail with "hpke: invalid KEM private key"
 				t.Skip("TODO")
 			}
+			testPassiveClient(t, &tc)
+		})
+	}
+}
+
+func TestPassiveClientCommit(t *testing.T) {
+	var tests []passiveClientTest
+	loadTestVector(t, "testdata/passive-client-handling-commit.json", &tests)
+
+	for i, tc := range tests {
+		t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
 			testPassiveClient(t, &tc)
 		})
 	}
