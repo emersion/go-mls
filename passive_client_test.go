@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"testing"
+	"time"
 )
 
 type passiveClientTest struct {
@@ -125,7 +126,8 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Errorf("groupInfo.cipherSuite = %v, want %v", groupInfo.groupContext.cipherSuite, keyPkg.cipherSuite)
 	}
 
-	if err := tree.verifyIntegrity(&groupInfo.groupContext); err != nil {
+	disableLifetimeCheck := func() time.Time { return time.Time{} }
+	if err := tree.verifyIntegrity(&groupInfo.groupContext, disableLifetimeCheck); err != nil {
 		t.Errorf("tree.verifyIntegrity() = %v", err)
 	}
 

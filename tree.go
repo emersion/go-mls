@@ -207,14 +207,13 @@ func (lt *lifetime) notAfterTime() time.Time {
 
 // verify ensures that the lifetime is valid: it has an acceptable range and
 // the current time is within that range.
-func (lt *lifetime) verify() bool {
+func (lt *lifetime) verify(t time.Time) bool {
 	notBefore, notAfter := lt.notBeforeTime(), lt.notAfterTime()
 
 	if d := notAfter.Sub(notBefore); d <= 0 || d > maxLeafNodeLifetime {
 		return false
 	}
 
-	t := time.Now()
 	return t.After(notBefore) && notAfter.After(t)
 }
 
@@ -373,9 +372,8 @@ func (node *leafNode) verifySignature(cs cipherSuite, groupID GroupID, li leafIn
 
 // verify performs leaf node validation described in section 7.3.
 //
-// It does not perform all checks:
-//
-//   - It does not check that the credential is valid.
+// It does not perform all checks: it does not check that the credential is
+// valid.
 func (node *leafNode) verify(options *leafNodeVerifyOptions) error {
 	li := options.leafIndex
 
@@ -389,7 +387,15 @@ func (node *leafNode) verify(options *leafNodeVerifyOptions) error {
 		return fmt.Errorf("mls: credential type %v used by leaf node not supported by all members", node.credential.credentialType)
 	}
 
-	// TODO: consider checking lifetime
+	if node.lifetime != nil {
+		now := options.now
+		if now == nil {
+			now = time.Now
+		}
+		if t := now(); !t.IsZero() && !node.lifetime.verify(t) {
+			return fmt.Errorf("mls: lifetime verification failed (not before %v, not after %v)", node.lifetime.notBeforeTime(), node.lifetime.notAfterTime())
+		}
+	}
 
 	supportedExts := make(map[extensionType]struct{})
 	for _, et := range node.capabilities.extensions {
@@ -418,6 +424,7 @@ type leafNodeVerifyOptions struct {
 	supportedCreds map[credentialType]struct{}
 	signatureKeys  map[string]struct{}
 	encryptionKeys map[string]struct{}
+	now            func() time.Time
 }
 
 type updatePathNode struct {
@@ -633,7 +640,7 @@ func (tree ratchetTree) resolve(x nodeIndex) []nodeIndex {
 //
 //   - It doesn't check that credentials are valid.
 //   - It doesn't check the lifetime field.
-func (tree ratchetTree) verifyIntegrity(ctx *groupContext) error {
+func (tree ratchetTree) verifyIntegrity(ctx *groupContext, now func() time.Time) error {
 	cs := ctx.cipherSuite
 	numLeaves := tree.numLeaves()
 
@@ -683,6 +690,7 @@ func (tree ratchetTree) verifyIntegrity(ctx *groupContext) error {
 			supportedCreds: supportedCreds,
 			signatureKeys:  signatureKeys,
 			encryptionKeys: encryptionKeys,
+			now:            now,
 		})
 		if err != nil {
 			return fmt.Errorf("leaf node at index %v: %v", li, err)
