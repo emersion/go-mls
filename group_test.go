@@ -175,6 +175,11 @@ func testMessageProtectionPriv(t *testing.T, tc *messageProtectionTest, ctx *gro
 		t.Fatalf("decryptContent() = %v", err)
 	}
 
+	framedContentTBS := newPrivateFramedContentTBS(privMsg, senderData, content, ctx)
+	if !content.auth.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), framedContentTBS) {
+		t.Errorf("verifySignature() failed")
+	}
+
 	var raw []byte
 	switch privMsg.contentType {
 	case contentTypeApplication:

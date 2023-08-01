@@ -522,8 +522,6 @@ func (msg *privateMessage) decryptContent(cs cipherSuite, secret ratchetSecret, 
 		}
 	}
 
-	// TODO: check framedContentAuthData
-
 	return &content, nil
 }
 
@@ -575,6 +573,28 @@ func (content *privateMessageContent) unmarshal(s *cryptobyte.String, ct content
 	}
 
 	return content.auth.unmarshal(s, ct)
+}
+
+func newPrivateFramedContentTBS(msg *privateMessage, senderData *senderData, content *privateMessageContent, ctx *groupContext) *framedContentTBS {
+	return &framedContentTBS{
+		version:    protocolVersionMLS10,
+		wireFormat: wireFormatMLSPrivateMessage,
+		content: framedContent{
+			groupID: msg.groupID,
+			epoch:   msg.epoch,
+			sender: sender{
+				senderType: senderTypeMember,
+				leafIndex:  senderData.leafIndex,
+			},
+			authenticatedData: msg.authenticatedData,
+
+			contentType:     msg.contentType,
+			applicationData: content.applicationData,
+			proposal:        content.proposal,
+			commit:          content.commit,
+		},
+		context: ctx,
+	}
 }
 
 type senderData struct {
