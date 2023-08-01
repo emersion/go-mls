@@ -1060,3 +1060,26 @@ func (tree ratchetTree) mergeUpdatePath(cs cipherSuite, senderLeafIndex leafInde
 
 	return nil
 }
+
+func (tree *ratchetTree) apply(proposals []proposal, senders []leafIndex) {
+	// Apply all update proposals
+	for i, prop := range proposals {
+		if prop.proposalType == proposalTypeUpdate {
+			tree.update(senders[i], &prop.update.leafNode)
+		}
+	}
+
+	// Apply all remove proposals
+	for _, prop := range proposals {
+		if prop.proposalType == proposalTypeRemove {
+			tree.remove(prop.remove.removed)
+		}
+	}
+
+	// Apply all add proposals
+	for _, prop := range proposals {
+		if prop.proposalType == proposalTypeAdd {
+			tree.add(&prop.add.keyPackage.leafNode)
+		}
+	}
+}

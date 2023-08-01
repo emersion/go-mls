@@ -205,6 +205,10 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 			}
 		}
 
+		newTree := make(ratchetTree, len(tree))
+		copy(newTree, tree)
+		newTree.apply(proposals, senders)
+
 		break // TODO: apply commit
 	}
 }
