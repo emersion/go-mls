@@ -217,6 +217,27 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		}
 
 		if commit.path != nil {
+			if commit.path.leafNode.leafNodeSource != leafNodeSourceCommit {
+				t.Errorf("commit path leaf node source must be commit")
+			}
+
+			// The same signature key can be re-used, but the encryption key
+			// must change
+			signatureKeys, encryptionKeys := tree.keys()
+			delete(signatureKeys, string(senderNode.signatureKey))
+			err := commit.path.leafNode.verify(&leafNodeVerifyOptions{
+				cipherSuite:    tc.CipherSuite,
+				groupID:        groupInfo.groupContext.groupID,
+				leafIndex:      senderLeafIndex,
+				supportedCreds: tree.supportedCreds(),
+				signatureKeys:  signatureKeys,
+				encryptionKeys: encryptionKeys,
+				now:            func() time.Time { return time.Time{} },
+			})
+			if err != nil {
+				t.Errorf("leafNode.verify() = %v", err)
+			}
+
 			if err := tree.mergeUpdatePath(tc.CipherSuite, senderLeafIndex, commit.path); err != nil {
 				t.Errorf("ratchetTree.mergeUpdatePath() = %v", err)
 			}
