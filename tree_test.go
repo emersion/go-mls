@@ -103,14 +103,14 @@ type treeKEMTest struct {
 }
 
 func testTreeKEM(t *testing.T, tc *treeKEMTest) {
-	var tree ratchetTree
-	if err := unmarshal([]byte(tc.RatchetTree), &tree); err != nil {
-		t.Fatalf("unmarshal(ratchetTree) = %v", err)
-	}
-
 	// TODO: test leaves_private
 
 	for _, updatePathTest := range tc.UpdatePaths {
+		var tree ratchetTree
+		if err := unmarshal([]byte(tc.RatchetTree), &tree); err != nil {
+			t.Fatalf("unmarshal(ratchetTree) = %v", err)
+		}
+
 		var up updatePath
 		if err := unmarshal([]byte(updatePathTest.UpdatePath), &up); err != nil {
 			t.Fatalf("unmarshal(updatePath) = %v", err)
@@ -131,8 +131,6 @@ func testTreeKEM(t *testing.T, tc *treeKEMTest) {
 		}
 
 		// TODO: create and verify new update path
-
-		break // TODO: only the first update is working, mergeUpdatePath is buggy
 	}
 }
 
