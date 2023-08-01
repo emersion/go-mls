@@ -238,6 +238,13 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 				t.Errorf("leafNode.verify() = %v", err)
 			}
 
+			for _, updateNode := range commit.path.nodes {
+				if _, dup := encryptionKeys[string(updateNode.encryptionKey)]; dup {
+					t.Errorf("encryption key in update path already used in ratchet tree")
+					break
+				}
+			}
+
 			if err := tree.mergeUpdatePath(tc.CipherSuite, senderLeafIndex, commit.path); err != nil {
 				t.Errorf("ratchetTree.mergeUpdatePath() = %v", err)
 			}
