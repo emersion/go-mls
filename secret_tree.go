@@ -22,6 +22,8 @@ func ratchetLabelFromContentType(ct contentType) ratchetLabel {
 	}
 }
 
+// secretTree holds tree node secrets used for the generation of encryption
+// keys and nonces.
 type secretTree [][]byte
 
 func deriveSecretTree(cs cipherSuite, n numLeaves, encryptionSecret []byte) (secretTree, error) {
@@ -74,6 +76,7 @@ func (tree secretTree) set(ni nodeIndex, secret []byte) {
 	tree[int(ni)] = secret
 }
 
+// deriveRatchetRoot derives the root of a ratchet for a tree node.
 func (tree secretTree) deriveRatchetRoot(cs cipherSuite, ni nodeIndex, label ratchetLabel) (ratchetSecret, error) {
 	_, kdf, _ := cs.hpke().Params()
 	nh := uint16(kdf.ExtractSize())
