@@ -147,6 +147,8 @@ func TestTreeKEM(t *testing.T) {
 }
 
 type treeOperationsTest struct {
+	CipherSuite cipherSuite `json:"cipher_suite"`
+
 	TreeBefore     testBytes `json:"tree_before"`
 	Proposal       testBytes `json:"proposal"`
 	ProposalSender leafIndex `json:"proposal_sender"`
@@ -157,14 +159,12 @@ type treeOperationsTest struct {
 }
 
 func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
-	cs := cipherSuiteMLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
-
 	var tree ratchetTree
 	if err := unmarshal([]byte(tc.TreeBefore), &tree); err != nil {
 		t.Fatalf("unmarshal(tree) = %v", err)
 	}
 
-	treeHash, err := tree.computeRootTreeHash(cs)
+	treeHash, err := tree.computeRootTreeHash(tc.CipherSuite)
 	if err != nil {
 		t.Errorf("ratchetTree.computeRootTreeHash() = %v", err)
 	} else if !bytes.Equal(treeHash, []byte(tc.TreeHashBefore)) {
@@ -189,7 +189,7 @@ func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
 	case proposalTypeUpdate:
 		signatureKeys, encryptionKeys := tree.keys()
 		err := prop.update.leafNode.verify(&leafNodeVerifyOptions{
-			cipherSuite:    cs,
+			cipherSuite:    tc.CipherSuite,
 			groupID:        nil,
 			leafIndex:      tc.ProposalSender,
 			supportedCreds: tree.supportedCreds(),
@@ -217,7 +217,7 @@ func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
 		t.Errorf("marshal(tree) = %v, want %v", rawTree, tc.TreeAfter)
 	}
 
-	treeHash, err = tree.computeRootTreeHash(cs)
+	treeHash, err = tree.computeRootTreeHash(tc.CipherSuite)
 	if err != nil {
 		t.Errorf("ratchetTree.computeRootTreeHash() = %v", err)
 	} else if !bytes.Equal(treeHash, []byte(tc.TreeHashAfter)) {
