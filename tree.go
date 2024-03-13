@@ -1237,8 +1237,19 @@ func (tree ratchetTree) decryptPathSecrets(cs cipherSuite, groupCtx *groupContex
 	}
 	privTree[int(recipientAncestor)] = nodePriv
 
-	// TODO: Derive path secrets for ancestors of that node in the sender's
-	// filtered direct path
+	// Derive path secrets for ancestors of that node in the sender's filtered
+	// direct path
+	for _, ni := range senderFilteredDirectPath[recipientAncestorIndex+1:] {
+		pathSecret, err = cs.deriveSecret(pathSecret, []byte("path"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive path secret: %v", err)
+		}
+		nodePriv, err := nodePrivFromPathSecret(cs, pathSecret, tree.get(ni).encryptionKey())
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive node %v private key from path secret: %v", ni, err)
+		}
+		privTree[int(ni)] = nodePriv
+	}
 
 	commitSecret, err := cs.deriveSecret(pathSecret, []byte("path"))
 	if err != nil {
