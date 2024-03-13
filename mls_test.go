@@ -4,6 +4,7 @@ import (
 	"encoding"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 
@@ -34,5 +35,30 @@ func loadTestVector(t *testing.T, filename string, v interface{}) {
 
 	if err := json.NewDecoder(f).Decode(v); err != nil {
 		t.Fatalf("failed to load test vector %q: %v", filename, err)
+	}
+}
+
+type deserializationTest struct {
+	VLBytesHeader testBytes `json:"vlbytes_header"`
+	Length        uint32    `json:"length"`
+}
+
+func TestDeserialization(t *testing.T) {
+	var tests []deserializationTest
+	loadTestVector(t, "testdata/deserialization.json", &tests)
+
+	for i, tc := range tests {
+		t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
+			var length uint32
+			s := tc.VLBytesHeader.ByteString()
+			if !readVarint(s, &length) {
+				t.Fatalf("readVarint() = false")
+			} else if !s.Empty() {
+				t.Errorf("byte string should be empty after readVarint()")
+			}
+			if length != tc.Length {
+				t.Errorf("got %v, want %v", length, tc.Length)
+			}
+		})
 	}
 }
