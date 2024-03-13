@@ -460,6 +460,29 @@ func (node *updatePathNode) marshal(b *cryptobyte.Builder) {
 	})
 }
 
+func decryptPathSecret(cs cipherSuite, nodePriv []byte, ctx *groupContext, ciphertext hpkeCiphertext) ([]byte, error) {
+	rawCtx, err := marshal(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return cs.decryptWithLabel(nodePriv, []byte("UpdatePathNode"), rawCtx, ciphertext.kemOutput, ciphertext.ciphertext)
+}
+
+func nodePrivFromPathSecret(cs cipherSuite, pathSecret []byte, nodePub hpkePublicKey) ([]byte, error) {
+	nodeSecret, err := cs.deriveSecret(pathSecret, []byte("node"))
+	if err != nil {
+		return nil, err
+	}
+	kem, _, _ := cs.hpke().Params()
+	pub, priv := kem.Scheme().DeriveKeyPair(nodeSecret)
+	if b, err := pub.MarshalBinary(); err != nil {
+		return nil, err
+	} else if !bytes.Equal(b, nodePub) {
+		return nil, fmt.Errorf("mls: node public key mismatch")
+	}
+	return priv.MarshalBinary()
+}
+
 type updatePath struct {
 	leafNode leafNode
 	nodes    []updatePathNode
@@ -1143,6 +1166,79 @@ func (tree ratchetTree) mergeUpdatePath(cs cipherSuite, senderLeafIndex leafInde
 		nodeType: nodeTypeLeaf,
 		leafNode: &path.leafNode,
 	})
+
+	return nil
+}
+
+func (tree ratchetTree) decryptPathSecrets(cs cipherSuite, groupCtx *groupContext, senderLeafIndex, recipientLeafIndex leafIndex, path *updatePath, privTree [][]byte) error {
+	senderNodeIndex := senderLeafIndex.nodeIndex()
+	recipientNodeIndex := recipientLeafIndex.nodeIndex()
+
+	senderFilteredDirectPath := tree.filteredDirectPath(senderNodeIndex)
+	if len(path.nodes) != len(senderFilteredDirectPath) {
+		return fmt.Errorf("mls: invalid UpdatePath length")
+	}
+
+	// Identify a node in the filtered direct path for which the recipient is
+	// in the subtree of the non-updated child
+	recipientAncestorIndex := -1
+	recipientAncestor := commonAncestor(senderNodeIndex, recipientNodeIndex)
+	for i, ni := range senderFilteredDirectPath {
+		if ni == recipientAncestor {
+			recipientAncestorIndex = i
+			break
+		}
+	}
+	if recipientAncestorIndex < 0 {
+		return fmt.Errorf("mls: cannot find recipient ancestor")
+	}
+
+	// Find the copath node
+	ancestor := commonAncestor(senderNodeIndex, recipientNodeIndex)
+	var (
+		copathNode nodeIndex
+		ok         bool
+	)
+	if recipientNodeIndex < senderNodeIndex {
+		copathNode, ok = ancestor.left()
+	} else {
+		copathNode, ok = ancestor.right()
+	}
+	if !ok {
+		panic("unreachable")
+	}
+
+	// Identify a node in the resolution of the copath node for which we have
+	// a private key
+	var nodePriv []byte
+	resolutionIndex := -1
+	for i, ni := range tree.resolve(copathNode) {
+		if p := privTree[int(ni)]; p != nil {
+			nodePriv = p
+			resolutionIndex = i
+			break
+		}
+	}
+	if nodePriv == nil {
+		return fmt.Errorf("mls: no private key found")
+	}
+
+	// Decrypt the path secret using the private key from the resolution node
+	updatePathNode := path.nodes[recipientAncestorIndex]
+	ciphertext := updatePathNode.encryptedPathSecret[resolutionIndex]
+	pathSecret, err := decryptPathSecret(cs, nodePriv, groupCtx, ciphertext)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt path secret: %v", err)
+	}
+	nodePub := tree.get(recipientAncestor).encryptionKey()
+	nodePriv, err = nodePrivFromPathSecret(cs, pathSecret, nodePub)
+	if err != nil {
+		return fmt.Errorf("failed to derive node %v private key from path secret: %v", recipientAncestor, err)
+	}
+	privTree[int(recipientAncestor)] = nodePriv
+
+	// TODO: Derive path secrets for ancestors of that node in the sender's
+	// filtered direct path
 
 	return nil
 }

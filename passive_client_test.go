@@ -288,6 +288,19 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 			if err := tree.mergeUpdatePath(tc.CipherSuite, senderLeafIndex, commit.path); err != nil {
 				t.Errorf("ratchetTree.mergeUpdatePath() = %v", err)
 			}
+
+			treeHash, err := tree.computeRootTreeHash(tc.CipherSuite)
+			if err != nil {
+				t.Fatalf("ratchetTree.computeRootTreeHash() = %v", err)
+			}
+			newGroupCtx := groupInfo.groupContext
+			newGroupCtx.epoch++
+			newGroupCtx.treeHash = treeHash
+			// TODO: extensions
+			err = tree.decryptPathSecrets(tc.CipherSuite, &newGroupCtx, senderLeafIndex, myLeafIndex, commit.path, privTree)
+			if err != nil {
+				t.Fatalf("ratchetTree.decryptPathSecrets() = %v", err)
+			}
 		}
 
 		break // TODO: apply commit
@@ -339,21 +352,6 @@ func checkSignatureKeyPair(cs cipherSuite, pub, priv []byte) error {
 	}
 
 	return nil
-}
-
-func nodePrivFromPathSecret(cs cipherSuite, pathSecret []byte, nodePub hpkePublicKey) ([]byte, error) {
-	nodeSecret, err := cs.deriveSecret(pathSecret, []byte("node"))
-	if err != nil {
-		return nil, err
-	}
-	kem, _, _ := cs.hpke().Params()
-	pub, priv := kem.Scheme().DeriveKeyPair(nodeSecret)
-	if b, err := pub.MarshalBinary(); err != nil {
-		return nil, err
-	} else if !bytes.Equal(b, nodePub) {
-		return nil, fmt.Errorf("public key mismatch")
-	}
-	return priv.MarshalBinary()
 }
 
 func TestPassiveClientWelcome(t *testing.T) {
