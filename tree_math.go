@@ -163,6 +163,27 @@ func (x nodeIndex) level() uint32 {
 	return lvl
 }
 
+// commonAncestor returns the the lowest node that is in the direct paths of
+// both leaves.
+func commonAncestor(x, y nodeIndex) nodeIndex {
+	// Handle cases where one is an ancestor of the other
+	lx, ly := x.level()+1, y.level()+1
+	if lx <= ly && x>>ly == y>>ly {
+		return y
+	} else if ly <= lx && x>>lx == y>>lx {
+		return x
+	}
+
+	// Handle other cases
+	xn, yn := x, y
+	k := 0
+	for xn != yn {
+		xn, yn = xn>>1, yn>>1
+		k++
+	}
+	return (xn << k) + (1 << (k - 1)) - 1
+}
+
 type leafIndex uint32
 
 // nodeIndex returns the index of the node from a leaf index.
