@@ -30,6 +30,12 @@ type passiveClientTest struct {
 	} `json:"epochs"`
 }
 
+type pendingProposal struct {
+	ref      proposalRef
+	proposal *proposal
+	sender   leafIndex
+}
+
 func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	initPriv := []byte(tc.InitPriv)
 	encryptionPriv := []byte(tc.EncryptionPriv)
@@ -196,6 +202,37 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	}
 
 	for _, epoch := range tc.Epochs {
+		var pendingProposals []pendingProposal
+		for _, rawProposal := range epoch.Proposals {
+			var msg mlsMessage
+			if err := unmarshal([]byte(rawProposal), &msg); err != nil {
+				t.Fatalf("unmarshal(proposal) = %v", err)
+			} else if msg.wireFormat != wireFormatMLSPublicMessage {
+				t.Fatalf("TODO: wireFormat = %v", msg.wireFormat)
+			}
+			pubMsg := msg.publicMessage
+
+			// TODO: public message checks
+
+			authContent := pubMsg.authenticatedContent()
+
+			if authContent.content.contentType != contentTypeProposal {
+				t.Errorf("contentType = %v, want %v", authContent.content.contentType, contentTypeProposal)
+			}
+			proposal := authContent.content.proposal
+
+			ref, err := authContent.generateProposalRef(tc.CipherSuite)
+			if err != nil {
+				t.Fatalf("proposal.generateRef() = %v", err)
+			}
+
+			pendingProposals = append(pendingProposals, pendingProposal{
+				ref:      ref,
+				proposal: proposal,
+				sender:   pubMsg.content.sender.leafIndex,
+			})
+		}
+
 		var msg mlsMessage
 		if err := unmarshal([]byte(epoch.Commit), &msg); err != nil {
 			t.Fatalf("unmarshal(commit) = %v", err)
@@ -245,7 +282,18 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 				proposals = append(proposals, *propOrRef.proposal)
 				senders = append(senders, senderLeafIndex)
 			case proposalOrRefTypeReference:
-				t.Skip("TODO: proposalOrRefTypeReference")
+				var found bool
+				for _, pp := range pendingProposals {
+					if pp.ref.Equal(propOrRef.reference) {
+						found = true
+						proposals = append(proposals, *pp.proposal)
+						senders = append(senders, pp.sender)
+						break
+					}
+				}
+				if !found {
+					t.Fatalf("cannot find proposal reference %v", propOrRef.reference)
+				}
 			}
 		}
 
