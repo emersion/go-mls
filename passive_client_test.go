@@ -264,6 +264,13 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		copy(newTree, tree)
 		newTree.apply(proposals, senders)
 
+		newPrivTree := make([][]byte, len(newTree))
+		for i := range tree {
+			if i < len(newPrivTree) {
+				newPrivTree[i] = privTree[i]
+			}
+		}
+
 		if proposalListNeedsPath(proposals) && commit.path == nil {
 			t.Errorf("proposal list needs update path")
 		}
@@ -313,7 +320,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 
 			// TODO: update group context extensions
 
-			commitSecret, err = newTree.decryptPathSecrets(tc.CipherSuite, &newGroupCtx, senderLeafIndex, myLeafIndex, commit.path, privTree)
+			commitSecret, err = newTree.decryptPathSecrets(tc.CipherSuite, &newGroupCtx, senderLeafIndex, myLeafIndex, commit.path, newPrivTree)
 			if err != nil {
 				t.Fatalf("ratchetTree.decryptPathSecrets() = %v", err)
 			}
@@ -362,12 +369,11 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		}
 
 		tree = newTree
+		privTree = newPrivTree
 		groupCtx = newGroupCtx
 		interimTranscriptHash = newInterimTranscriptHash
 		epochSecret = newEpochSecret
 		initSecret = newInitSecret
-
-		break // TODO: process subsequent epochs
 	}
 }
 
