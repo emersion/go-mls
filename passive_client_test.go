@@ -516,7 +516,9 @@ func TestPassiveClientWelcome(t *testing.T) {
 	for i, tc := range tests {
 		t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
 			if i == 32 || (i >= 34 && i <= 39) {
-				// TODO: for some reason these fail with "hpke: invalid KEM private key"
+				// TODO: re-enable these once the encryption private key size
+				// is fixed:
+				// https://github.com/mlswg/mls-implementations/issues/183
 				t.Skip("TODO")
 			}
 			testPassiveClient(t, &tc)
