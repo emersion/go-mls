@@ -1170,13 +1170,13 @@ func (tree ratchetTree) mergeUpdatePath(cs cipherSuite, senderLeafIndex leafInde
 	return nil
 }
 
-func (tree ratchetTree) decryptPathSecrets(cs cipherSuite, groupCtx *groupContext, senderLeafIndex, recipientLeafIndex leafIndex, path *updatePath, privTree [][]byte) error {
+func (tree ratchetTree) decryptPathSecrets(cs cipherSuite, groupCtx *groupContext, senderLeafIndex, recipientLeafIndex leafIndex, path *updatePath, privTree [][]byte) ([]byte, error) {
 	senderNodeIndex := senderLeafIndex.nodeIndex()
 	recipientNodeIndex := recipientLeafIndex.nodeIndex()
 
 	senderFilteredDirectPath := tree.filteredDirectPath(senderNodeIndex)
 	if len(path.nodes) != len(senderFilteredDirectPath) {
-		return fmt.Errorf("mls: invalid UpdatePath length")
+		return nil, fmt.Errorf("mls: invalid UpdatePath length")
 	}
 
 	// Identify a node in the filtered direct path for which the recipient is
@@ -1190,7 +1190,7 @@ func (tree ratchetTree) decryptPathSecrets(cs cipherSuite, groupCtx *groupContex
 		}
 	}
 	if recipientAncestorIndex < 0 {
-		return fmt.Errorf("mls: cannot find recipient ancestor")
+		return nil, fmt.Errorf("mls: cannot find recipient ancestor")
 	}
 
 	// Find the copath node
@@ -1220,7 +1220,7 @@ func (tree ratchetTree) decryptPathSecrets(cs cipherSuite, groupCtx *groupContex
 		}
 	}
 	if nodePriv == nil {
-		return fmt.Errorf("mls: no private key found")
+		return nil, fmt.Errorf("mls: no private key found")
 	}
 
 	// Decrypt the path secret using the private key from the resolution node
@@ -1228,19 +1228,24 @@ func (tree ratchetTree) decryptPathSecrets(cs cipherSuite, groupCtx *groupContex
 	ciphertext := updatePathNode.encryptedPathSecret[resolutionIndex]
 	pathSecret, err := decryptPathSecret(cs, nodePriv, groupCtx, ciphertext)
 	if err != nil {
-		return fmt.Errorf("failed to decrypt path secret: %v", err)
+		return nil, fmt.Errorf("failed to decrypt path secret: %v", err)
 	}
 	nodePub := tree.get(recipientAncestor).encryptionKey()
 	nodePriv, err = nodePrivFromPathSecret(cs, pathSecret, nodePub)
 	if err != nil {
-		return fmt.Errorf("failed to derive node %v private key from path secret: %v", recipientAncestor, err)
+		return nil, fmt.Errorf("failed to derive node %v private key from path secret: %v", recipientAncestor, err)
 	}
 	privTree[int(recipientAncestor)] = nodePriv
 
 	// TODO: Derive path secrets for ancestors of that node in the sender's
 	// filtered direct path
 
-	return nil
+	commitSecret, err := cs.deriveSecret(pathSecret, []byte("path"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive commit secret: %v", err)
+	}
+
+	return commitSecret, nil
 }
 
 func (tree *ratchetTree) apply(proposals []proposal, senders []leafIndex) {
