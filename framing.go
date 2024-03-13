@@ -287,6 +287,12 @@ func (authContent *authenticatedContent) unmarshal(s *cryptobyte.String) error {
 	return nil
 }
 
+func (authContent *authenticatedContent) marshal(b *cryptobyte.Builder) {
+	authContent.wireFormat.marshal(b)
+	authContent.content.marshal(b)
+	authContent.auth.marshal(b, authContent.content.contentType)
+}
+
 func (authContent *authenticatedContent) confirmedTranscriptHashInput() *confirmedTranscriptHashInput {
 	return &confirmedTranscriptHashInput{
 		wireFormat: authContent.wireFormat,
@@ -306,6 +312,26 @@ func (authContent *authenticatedContent) framedContentTBS(ctx *groupContext) *fr
 
 func (authContent *authenticatedContent) verifySignature(cs cipherSuite, verifKey []byte, ctx *groupContext) bool {
 	return authContent.auth.verifySignature(cs, verifKey, authContent.framedContentTBS(ctx))
+}
+
+func (authContent *authenticatedContent) generateProposalRef(cs cipherSuite) (proposalRef, error) {
+	if authContent.content.contentType != contentTypeProposal {
+		panic("mls: AuthenticatedContent is not a proposal")
+	}
+
+	var b cryptobyte.Builder
+	authContent.marshal(&b)
+	raw, err := b.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	hash, err := cs.refHash([]byte("MLS 1.0 Proposal Reference"), raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return proposalRef(hash), nil
 }
 
 type framedContentAuthData struct {
