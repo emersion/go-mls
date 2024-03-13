@@ -302,12 +302,6 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		}
 		// TODO: additional proposal list checks
 
-		for _, prop := range proposals {
-			if prop.proposalType == proposalTypePSK {
-				t.Skip("TODO: no PSK available")
-			}
-		}
-
 		newTree := make(ratchetTree, len(tree))
 		copy(newTree, tree)
 		newTree.apply(proposals, senders)
@@ -321,6 +315,34 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 
 		if proposalListNeedsPath(proposals) && commit.path == nil {
 			t.Errorf("proposal list needs update path")
+		}
+
+		var (
+			pskIDs []preSharedKeyID
+			psks   [][]byte
+		)
+		for _, prop := range proposals {
+			if prop.proposalType != proposalTypePSK {
+				continue
+			}
+
+			pskID := prop.preSharedKey.psk
+			if pskID.pskType != pskTypeExternal {
+				t.Skipf("TODO: PSK ID type = %v", pskID.pskType)
+			}
+
+			found := false
+			for _, epsk := range tc.ExternalPSKs {
+				if bytes.Equal([]byte(epsk.PSKID), pskID.pskID) {
+					pskIDs = append(pskIDs, pskID)
+					psks = append(psks, []byte(epsk.PSK))
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Fatalf("PSK ID %v not found", pskID.pskID)
+			}
 		}
 
 		newGroupCtx := groupCtx
@@ -384,14 +406,17 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 			t.Fatalf("nextInterimTranscriptHash() = %v", err)
 		}
 
-		// TODO: PSK secret
+		newPSKSecret, err := extractPSKSecret(tc.CipherSuite, pskIDs, psks)
+		if err != nil {
+			t.Fatalf("extractPSKSecret() = %v", err)
+		}
 
 		newJoinerSecret, err := newGroupCtx.extractJoinerSecret(initSecret, commitSecret)
 		if err != nil {
 			t.Fatalf("groupContext.extractJoinerSecret() = %v", err)
 		}
 
-		newEpochSecret, err := newGroupCtx.extractEpochSecret(newJoinerSecret, pskSecret)
+		newEpochSecret, err := newGroupCtx.extractEpochSecret(newJoinerSecret, newPSKSecret)
 		if err != nil {
 			t.Fatalf("groupContext.extractEpochSecret() = %v", err)
 		}
@@ -420,6 +445,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		privTree = newPrivTree
 		groupCtx = newGroupCtx
 		interimTranscriptHash = newInterimTranscriptHash
+		pskSecret = newPSKSecret
 		epochSecret = newEpochSecret
 		initSecret = newInitSecret
 	}
