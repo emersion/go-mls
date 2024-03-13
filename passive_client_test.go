@@ -131,9 +131,43 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Errorf("tree.verifyIntegrity() = %v", err)
 	}
 
-	_, ok := tree.findLeaf(&keyPkg.leafNode)
+	myLeafIndex, ok := tree.findLeaf(&keyPkg.leafNode)
 	if !ok {
 		t.Errorf("tree.findLeaf() = false")
+	}
+
+	privTree := make([][]byte, len(tree))
+	privTree[int(myLeafIndex.nodeIndex())] = encryptionPriv
+
+	// TODO: drop the seed size check, see:
+	// https://github.com/cloudflare/circl/issues/486
+	kem, kdf, _ := tc.CipherSuite.hpke().Params()
+	if groupSecrets.pathSecret != nil && kem.Scheme().SeedSize() == kdf.ExtractSize() {
+		nodeIndex := commonAncestor(myLeafIndex.nodeIndex(), groupInfo.signer.nodeIndex())
+		nodePriv, err := nodePrivFromPathSecret(tc.CipherSuite, groupSecrets.pathSecret, tree.get(nodeIndex).encryptionKey())
+		if err != nil {
+			t.Fatalf("failed to derive node %v private key from path secret: %v", nodeIndex, err)
+		}
+		privTree[int(nodeIndex)] = nodePriv
+
+		pathSecret := groupSecrets.pathSecret
+		for {
+			nodeIndex, ok = tree.numLeaves().parent(nodeIndex)
+			if !ok {
+				break
+			}
+
+			pathSecret, err := tc.CipherSuite.deriveSecret(pathSecret, []byte("path"))
+			if err != nil {
+				t.Fatalf("deriveSecret(pathSecret[n-1]) = %v", err)
+			}
+
+			nodePriv, err := nodePrivFromPathSecret(tc.CipherSuite, pathSecret, tree.get(nodeIndex).encryptionKey())
+			if err != nil {
+				t.Fatalf("failed to derive node %v private key from path secret: %v", nodeIndex, err)
+			}
+			privTree[int(nodeIndex)] = nodePriv
+		}
 	}
 
 	// TODO: perform other group info verification steps
@@ -305,6 +339,21 @@ func checkSignatureKeyPair(cs cipherSuite, pub, priv []byte) error {
 	}
 
 	return nil
+}
+
+func nodePrivFromPathSecret(cs cipherSuite, pathSecret []byte, nodePub hpkePublicKey) ([]byte, error) {
+	nodeSecret, err := cs.deriveSecret(pathSecret, []byte("node"))
+	if err != nil {
+		return nil, err
+	}
+	kem, _, _ := cs.hpke().Params()
+	pub, priv := kem.Scheme().DeriveKeyPair(nodeSecret)
+	if b, err := pub.MarshalBinary(); err != nil {
+		return nil, err
+	} else if !bytes.Equal(b, nodePub) {
+		return nil, fmt.Errorf("public key mismatch")
+	}
+	return priv.MarshalBinary()
 }
 
 func TestPassiveClientWelcome(t *testing.T) {
