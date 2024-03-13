@@ -37,6 +37,7 @@ type pendingProposal struct {
 }
 
 func testPassiveClient(t *testing.T, tc *passiveClientTest) {
+	cs := tc.CipherSuite
 	initPriv := []byte(tc.InitPriv)
 	encryptionPriv := []byte(tc.EncryptionPriv)
 	signaturePriv := []byte(tc.SignaturePriv)
@@ -53,13 +54,13 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	}
 	keyPkg := msg.keyPackage
 
-	if err := checkEncryptionKeyPair(tc.CipherSuite, keyPkg.initKey, initPriv); err != nil {
+	if err := checkEncryptionKeyPair(cs, keyPkg.initKey, initPriv); err != nil {
 		t.Errorf("invalid init keypair: %v", err)
 	}
-	if err := checkEncryptionKeyPair(tc.CipherSuite, keyPkg.leafNode.encryptionKey, encryptionPriv); err != nil {
+	if err := checkEncryptionKeyPair(cs, keyPkg.leafNode.encryptionKey, encryptionPriv); err != nil {
 		t.Errorf("invalid encryption keypair: %v", err)
 	}
-	if err := checkSignatureKeyPair(tc.CipherSuite, []byte(keyPkg.leafNode.signatureKey), signaturePriv); err != nil {
+	if err := checkSignatureKeyPair(cs, []byte(keyPkg.leafNode.signatureKey), signaturePriv); err != nil {
 		t.Errorf("invalid signature keypair: %v", err)
 	}
 
@@ -96,7 +97,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		}
 	}
 
-	pskSecret, err := extractPSKSecret(tc.CipherSuite, groupSecrets.psks, psks)
+	pskSecret, err := extractPSKSecret(cs, groupSecrets.psks, psks)
 	if err != nil {
 		t.Fatalf("extractPSKSecret() = %v", err)
 	}
@@ -147,10 +148,10 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 
 	// TODO: drop the seed size check, see:
 	// https://github.com/cloudflare/circl/issues/486
-	kem, kdf, _ := tc.CipherSuite.hpke().Params()
+	kem, kdf, _ := cs.hpke().Params()
 	if groupSecrets.pathSecret != nil && kem.Scheme().SeedSize() == kdf.ExtractSize() {
 		nodeIndex := commonAncestor(myLeafIndex.nodeIndex(), groupInfo.signer.nodeIndex())
-		nodePriv, err := nodePrivFromPathSecret(tc.CipherSuite, groupSecrets.pathSecret, tree.get(nodeIndex).encryptionKey())
+		nodePriv, err := nodePrivFromPathSecret(cs, groupSecrets.pathSecret, tree.get(nodeIndex).encryptionKey())
 		if err != nil {
 			t.Fatalf("failed to derive node %v private key from path secret: %v", nodeIndex, err)
 		}
@@ -163,12 +164,12 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 				break
 			}
 
-			pathSecret, err := tc.CipherSuite.deriveSecret(pathSecret, []byte("path"))
+			pathSecret, err := cs.deriveSecret(pathSecret, []byte("path"))
 			if err != nil {
 				t.Fatalf("deriveSecret(pathSecret[n-1]) = %v", err)
 			}
 
-			nodePriv, err := nodePrivFromPathSecret(tc.CipherSuite, pathSecret, tree.get(nodeIndex).encryptionKey())
+			nodePriv, err := nodePrivFromPathSecret(cs, pathSecret, tree.get(nodeIndex).encryptionKey())
 			if err != nil {
 				t.Fatalf("failed to derive node %v private key from path secret: %v", nodeIndex, err)
 			}
@@ -184,19 +185,19 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	if err != nil {
 		t.Fatalf("groupContext.extractEpochSecret() = %v", err)
 	}
-	epochAuthenticator, err := tc.CipherSuite.deriveSecret(epochSecret, secretLabelAuthentication)
+	epochAuthenticator, err := cs.deriveSecret(epochSecret, secretLabelAuthentication)
 	if err != nil {
 		t.Errorf("deriveSecret(authentication) = %v", err)
 	} else if !bytes.Equal(epochAuthenticator, []byte(tc.InitialEpochAuthenticator)) {
 		t.Errorf("deriveSecret(authentication) = %v, want %v", epochAuthenticator, tc.InitialEpochAuthenticator)
 	}
 
-	initSecret, err := tc.CipherSuite.deriveSecret(epochSecret, secretLabelInit)
+	initSecret, err := cs.deriveSecret(epochSecret, secretLabelInit)
 	if err != nil {
 		t.Errorf("deriveSecret(init) = %v", err)
 	}
 
-	interimTranscriptHash, err := nextInterimTranscriptHash(tc.CipherSuite, groupCtx.confirmedTranscriptHash, groupInfo.confirmationTag)
+	interimTranscriptHash, err := nextInterimTranscriptHash(cs, groupCtx.confirmedTranscriptHash, groupInfo.confirmationTag)
 	if err != nil {
 		t.Errorf("nextInterimTranscriptHash() = %v", err)
 	}
@@ -221,7 +222,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 			}
 			proposal := authContent.content.proposal
 
-			ref, err := authContent.generateProposalRef(tc.CipherSuite)
+			ref, err := authContent.generateProposalRef(cs)
 			if err != nil {
 				t.Fatalf("proposal.generateRef() = %v", err)
 			}
@@ -256,14 +257,14 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		}
 
 		authContent := pubMsg.authenticatedContent()
-		if !authContent.verifySignature(tc.CipherSuite, []byte(senderNode.signatureKey), &groupCtx) {
+		if !authContent.verifySignature(cs, []byte(senderNode.signatureKey), &groupCtx) {
 			t.Errorf("verifySignature() failed")
 		}
 
-		membershipKey, err := tc.CipherSuite.deriveSecret(epochSecret, secretLabelMembership)
+		membershipKey, err := cs.deriveSecret(epochSecret, secretLabelMembership)
 		if err != nil {
 			t.Errorf("deriveSecret(membership) = %v", err)
-		} else if !pubMsg.verifyMembershipTag(tc.CipherSuite, membershipKey, &groupCtx) {
+		} else if !pubMsg.verifyMembershipTag(cs, membershipKey, &groupCtx) {
 			t.Errorf("publicMessage.verifyMembershipTag() failed")
 		}
 
@@ -348,7 +349,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		newGroupCtx := groupCtx
 		newGroupCtx.epoch++
 
-		_, kdf, _ := tc.CipherSuite.hpke().Params()
+		_, kdf, _ := cs.hpke().Params()
 		commitSecret := make([]byte, kdf.ExtractSize())
 		if commit.path != nil {
 			if commit.path.leafNode.leafNodeSource != leafNodeSourceCommit {
@@ -360,7 +361,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 			signatureKeys, encryptionKeys := newTree.keys()
 			delete(signatureKeys, string(senderNode.signatureKey))
 			err := commit.path.leafNode.verify(&leafNodeVerifyOptions{
-				cipherSuite:    tc.CipherSuite,
+				cipherSuite:    cs,
 				groupID:        groupCtx.groupID,
 				leafIndex:      senderLeafIndex,
 				supportedCreds: newTree.supportedCreds(),
@@ -379,34 +380,34 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 				}
 			}
 
-			if err := newTree.mergeUpdatePath(tc.CipherSuite, senderLeafIndex, commit.path); err != nil {
+			if err := newTree.mergeUpdatePath(cs, senderLeafIndex, commit.path); err != nil {
 				t.Errorf("ratchetTree.mergeUpdatePath() = %v", err)
 			}
 
-			newGroupCtx.treeHash, err = newTree.computeRootTreeHash(tc.CipherSuite)
+			newGroupCtx.treeHash, err = newTree.computeRootTreeHash(cs)
 			if err != nil {
 				t.Fatalf("ratchetTree.computeRootTreeHash() = %v", err)
 			}
 
 			// TODO: update group context extensions
 
-			commitSecret, err = newTree.decryptPathSecrets(tc.CipherSuite, &newGroupCtx, senderLeafIndex, myLeafIndex, commit.path, newPrivTree)
+			commitSecret, err = newTree.decryptPathSecrets(cs, &newGroupCtx, senderLeafIndex, myLeafIndex, commit.path, newPrivTree)
 			if err != nil {
 				t.Fatalf("ratchetTree.decryptPathSecrets() = %v", err)
 			}
 		}
 
-		newGroupCtx.confirmedTranscriptHash, err = authContent.confirmedTranscriptHashInput().hash(tc.CipherSuite, interimTranscriptHash)
+		newGroupCtx.confirmedTranscriptHash, err = authContent.confirmedTranscriptHashInput().hash(cs, interimTranscriptHash)
 		if err != nil {
 			t.Fatalf("confirmedTranscriptHashInput.hash() = %v", err)
 		}
 
-		newInterimTranscriptHash, err := nextInterimTranscriptHash(tc.CipherSuite, newGroupCtx.confirmedTranscriptHash, authContent.auth.confirmationTag)
+		newInterimTranscriptHash, err := nextInterimTranscriptHash(cs, newGroupCtx.confirmedTranscriptHash, authContent.auth.confirmationTag)
 		if err != nil {
 			t.Fatalf("nextInterimTranscriptHash() = %v", err)
 		}
 
-		newPSKSecret, err := extractPSKSecret(tc.CipherSuite, pskIDs, psks)
+		newPSKSecret, err := extractPSKSecret(cs, pskIDs, psks)
 		if err != nil {
 			t.Fatalf("extractPSKSecret() = %v", err)
 		}
@@ -420,23 +421,23 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		if err != nil {
 			t.Fatalf("groupContext.extractEpochSecret() = %v", err)
 		}
-		epochAuthenticator, err := tc.CipherSuite.deriveSecret(newEpochSecret, secretLabelAuthentication)
+		epochAuthenticator, err := cs.deriveSecret(newEpochSecret, secretLabelAuthentication)
 		if err != nil {
 			t.Fatalf("deriveSecret(authentication) = %v", err)
 		} else if !bytes.Equal(epochAuthenticator, []byte(epoch.EpochAuthenticator)) {
 			t.Errorf("deriveSecret(authentication) = %v, want %v", epochAuthenticator, epoch.EpochAuthenticator)
 		}
 
-		newInitSecret, err := tc.CipherSuite.deriveSecret(newEpochSecret, secretLabelInit)
+		newInitSecret, err := cs.deriveSecret(newEpochSecret, secretLabelInit)
 		if err != nil {
 			t.Fatalf("deriveSecret(init) = %v", err)
 		}
 
-		confirmationKey, err := tc.CipherSuite.deriveSecret(newEpochSecret, secretLabelConfirm)
+		confirmationKey, err := cs.deriveSecret(newEpochSecret, secretLabelConfirm)
 		if err != nil {
 			t.Fatalf("deriveSecret(confirm) = %v", err)
 		}
-		confirmationTag := tc.CipherSuite.signMAC(confirmationKey, newGroupCtx.confirmedTranscriptHash)
+		confirmationTag := cs.signMAC(confirmationKey, newGroupCtx.confirmedTranscriptHash)
 		if !bytes.Equal(confirmationTag, authContent.auth.confirmationTag) {
 			t.Errorf("invalid confirmation tag")
 		}
