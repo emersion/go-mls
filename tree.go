@@ -549,6 +549,17 @@ func (n *node) marshal(b *cryptobyte.Builder) {
 	}
 }
 
+func (n *node) encryptionKey() hpkePublicKey {
+	switch n.nodeType {
+	case nodeTypeLeaf:
+		return n.leafNode.encryptionKey
+	case nodeTypeParent:
+		return n.parentNode.encryptionKey
+	default:
+		panic("unreachable")
+	}
+}
+
 type ratchetTree []*node
 
 func (tree *ratchetTree) unmarshal(s *cryptobyte.String) error {
