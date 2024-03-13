@@ -1,6 +1,7 @@
 package mls
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
@@ -246,6 +247,10 @@ func (t proposalOrRefType) marshal(b *cryptobyte.Builder) {
 }
 
 type proposalRef []byte
+
+func (ref proposalRef) Equal(other proposalRef) bool {
+	return bytes.Equal([]byte(ref), []byte(other))
+}
 
 type proposalOrRef struct {
 	typ       proposalOrRefType
