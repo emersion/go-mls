@@ -94,6 +94,18 @@ func extractWelcomeSecret(cs cipherSuite, joinerSecret, pskSecret []byte) ([]byt
 	return cs.deriveSecret(extracted, []byte("welcome"))
 }
 
+func deriveExporter(cs cipherSuite, exporterSecret, label, context []byte, length uint16) ([]byte, error) {
+	derived, err := cs.deriveSecret(exporterSecret, label)
+	if err != nil {
+		return nil, err
+	}
+
+	h := cs.hash().New()
+	h.Write(context)
+
+	return cs.expandWithLabel(derived, []byte("exported"), h.Sum(nil), length)
+}
+
 var (
 	secretLabelInit           = []byte("init")
 	secretLabelSenderData     = []byte("sender data")

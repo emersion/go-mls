@@ -83,7 +83,7 @@ type keyScheduleTest struct {
 		Exporter    struct {
 			Label   string    `json:"label"`
 			Context testBytes `json:"context"`
-			Length  uint32    `json:"length"`
+			Length  uint16    `json:"length"`
 			Secret  testBytes `json:"secret"`
 		} `json:"exporter"`
 	} `json:"epochs"`
@@ -169,7 +169,13 @@ func testKeySchedule(t *testing.T, tc *keyScheduleTest) {
 			}
 		}
 
-		// TODO: verify exporter secret
+		exporterSecret := []byte(epoch.ExporterSecret)
+		b, err := deriveExporter(ctx.cipherSuite, exporterSecret, []byte(epoch.Exporter.Label), []byte(epoch.Exporter.Context), epoch.Exporter.Length)
+		if err != nil {
+			t.Errorf("deriveExporter() = %v", err)
+		} else if !bytes.Equal(b, epoch.Exporter.Secret) {
+			t.Errorf("deriveExporter() = %v, want %v", b, epoch.Exporter.Secret)
+		}
 	}
 }
 
