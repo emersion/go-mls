@@ -1192,6 +1192,7 @@ func (tree ratchetTree) decryptPathSecrets(cs cipherSuite, groupCtx *groupContex
 	if recipientAncestorIndex < 0 {
 		return nil, fmt.Errorf("mls: cannot find recipient ancestor")
 	}
+	updatePathNode := path.nodes[recipientAncestorIndex]
 
 	// Find the copath node
 	ancestor := commonAncestor(senderNodeIndex, recipientNodeIndex)
@@ -1208,11 +1209,16 @@ func (tree ratchetTree) decryptPathSecrets(cs cipherSuite, groupCtx *groupContex
 		panic("unreachable")
 	}
 
+	copathResolution := tree.resolve(copathNode)
+	if len(updatePathNode.encryptedPathSecret) != len(copathResolution) {
+		return nil, fmt.Errorf("mls: invalid UpdatePathNode.encrypted_path_secret length")
+	}
+
 	// Identify a node in the resolution of the copath node for which we have
 	// a private key
 	var nodePriv []byte
 	resolutionIndex := -1
-	for i, ni := range tree.resolve(copathNode) {
+	for i, ni := range copathResolution {
 		if p := privTree[int(ni)]; p != nil {
 			nodePriv = p
 			resolutionIndex = i
@@ -1222,10 +1228,9 @@ func (tree ratchetTree) decryptPathSecrets(cs cipherSuite, groupCtx *groupContex
 	if nodePriv == nil {
 		return nil, fmt.Errorf("mls: no private key found")
 	}
+	ciphertext := updatePathNode.encryptedPathSecret[resolutionIndex]
 
 	// Decrypt the path secret using the private key from the resolution node
-	updatePathNode := path.nodes[recipientAncestorIndex]
-	ciphertext := updatePathNode.encryptedPathSecret[resolutionIndex]
 	pathSecret, err := decryptPathSecret(cs, nodePriv, groupCtx, ciphertext)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt path secret: %v", err)
