@@ -449,7 +449,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		}
 		confirmationTag := cs.signMAC(confirmationKey, newGroupCtx.confirmedTranscriptHash)
 		if !bytes.Equal(confirmationTag, authContent.auth.confirmationTag) {
-			t.Errorf("invalid confirmation tag")
+			t.Errorf("invalid confirmation tag: got %v, want %v", confirmationTag, authContent.auth.confirmationTag)
 		}
 
 		tree = newTree
