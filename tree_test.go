@@ -104,7 +104,63 @@ type treeKEMTest struct {
 }
 
 func testTreeKEM(t *testing.T, tc *treeKEMTest) {
-	// TODO: test leaves_private
+	type privNode struct {
+		encryptionPriv []byte
+		signaturePriv  []byte
+	}
+
+	for _, leafPrivate := range tc.LeavesPrivate {
+		var tree ratchetTree
+		if err := unmarshal([]byte(tc.RatchetTree), &tree); err != nil {
+			t.Fatalf("unmarshal(ratchetTree) = %v", err)
+		}
+
+		privTree := make([]privNode, len(tree))
+		privTree[int(leafPrivate.Index.nodeIndex())] = privNode{
+			encryptionPriv: leafPrivate.EncryptionPriv,
+			signaturePriv:  leafPrivate.SignaturePriv,
+		}
+
+		// TODO: drop the seed size check, see:
+		// https://github.com/cloudflare/circl/issues/486
+		kem, kdf, _ := tc.CipherSuite.hpke().Params()
+		if kem.Scheme().SeedSize() != kdf.ExtractSize() {
+			continue
+		}
+
+		for _, ps := range leafPrivate.PathSecrets {
+			priv, err := nodePrivFromPathSecret(tc.CipherSuite, ps.PathSecret, tree.get(ps.Node).encryptionKey())
+			if err != nil {
+				t.Fatalf("failed to derive node %v private key from path secret: %v", ps.Node, err)
+			}
+
+			privTree[int(ps.Node)] = privNode{
+				encryptionPriv: priv,
+			}
+		}
+
+		for i, privNode := range privTree {
+			if privNode.encryptionPriv == nil {
+				continue
+			}
+
+			priv, err := kem.Scheme().UnmarshalBinaryPrivateKey(privNode.encryptionPriv)
+			if err != nil {
+				t.Fatalf("UnmarshalBinaryPrivateKey() = %v", err)
+			}
+
+			pub, err := kem.Scheme().UnmarshalBinaryPublicKey(tree[i].encryptionKey())
+			if err != nil {
+				t.Fatalf("UnmarshalBinaryPublicKey() = %v", err)
+			}
+
+			if !priv.Public().Equal(pub) {
+				t.Errorf("key pair mismatch for node %v", i)
+			}
+
+			// TODO: check signature key
+		}
+	}
 
 	for _, updatePathTest := range tc.UpdatePaths {
 		var tree ratchetTree
