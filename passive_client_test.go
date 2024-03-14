@@ -212,7 +212,9 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Errorf("nextInterimTranscriptHash() = %v", err)
 	}
 
-	for _, epoch := range tc.Epochs {
+	for i, epoch := range tc.Epochs {
+		t.Logf("epoch %v", i)
+
 		var pendingProposals []pendingProposal
 		for _, rawProposal := range epoch.Proposals {
 			var msg mlsMessage
