@@ -42,6 +42,13 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	encryptionPriv := []byte(tc.EncryptionPriv)
 	signaturePriv := []byte(tc.SignaturePriv)
 
+	// TODO: drop the seed size check, see:
+	// https://github.com/cloudflare/circl/issues/486
+	kem, kdf, _ := cs.hpke().Params()
+	if kem.Scheme().SeedSize() != kdf.ExtractSize() {
+		t.Skip("TODO: kem.Scheme().SeedSize() != kdf.ExtractSize()")
+	}
+
 	msg, err := unmarshalMLSMessage(tc.Welcome, wireFormatMLSWelcome)
 	if err != nil {
 		t.Fatalf("unmarshal(welcome) = %v", err)
@@ -153,13 +160,6 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	privTree[int(myLeafIndex.nodeIndex())] = encryptionPriv
 
 	if groupSecrets.pathSecret != nil {
-		// TODO: drop the seed size check, see:
-		// https://github.com/cloudflare/circl/issues/486
-		kem, kdf, _ := cs.hpke().Params()
-		if kem.Scheme().SeedSize() != kdf.ExtractSize() {
-			t.Skip("TODO: kem.Scheme().SeedSize() != kdf.ExtractSize()")
-		}
-
 		nodeIndex := commonAncestor(myLeafIndex.nodeIndex(), groupInfo.signer.nodeIndex())
 		nodePriv, err := nodePrivFromPathSecret(cs, groupSecrets.pathSecret, tree.get(nodeIndex).encryptionKey())
 		if err != nil {
