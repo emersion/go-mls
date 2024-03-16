@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/cloudflare/circl/hpke"
 )
 
 type passiveClientTest struct {
@@ -38,9 +40,9 @@ type pendingProposal struct {
 
 func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	cs := tc.CipherSuite
-	initPriv := []byte(tc.InitPriv)
-	encryptionPriv := []byte(tc.EncryptionPriv)
-	signaturePriv := []byte(tc.SignaturePriv)
+	initPriv := normalizePriv(cs, []byte(tc.InitPriv))
+	encryptionPriv := normalizePriv(cs, []byte(tc.EncryptionPriv))
+	signaturePriv := normalizePriv(cs, []byte(tc.SignaturePriv))
 
 	// TODO: drop the seed size check, see:
 	// https://github.com/cloudflare/circl/issues/486
@@ -464,6 +466,20 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	}
 }
 
+// normalizePriv ensures that private keys in test vectors have the correct
+// size according to the HPKE specification. See:
+// https://github.com/mlswg/mls-implementations/issues/176
+func normalizePriv(cs cipherSuite, priv []byte) []byte {
+	kem, _, _ := cs.hpke().Params()
+	privSize := kem.Scheme().PrivateKeySize()
+	if kem != hpke.KEM_P521_HKDF_SHA512 || len(priv) >= privSize {
+		return priv
+	}
+	b := make([]byte, privSize)
+	copy(b[privSize-len(priv):], priv)
+	return b
+}
+
 func unmarshalMLSMessage(raw testBytes, wf wireFormat) (*mlsMessage, error) {
 	var msg mlsMessage
 	if err := unmarshal([]byte(raw), &msg); err != nil {
@@ -517,12 +533,6 @@ func TestPassiveClientWelcome(t *testing.T) {
 
 	for i, tc := range tests {
 		t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
-			if i == 32 || (i >= 34 && i <= 39) {
-				// TODO: re-enable these once the encryption private key size
-				// is fixed:
-				// https://github.com/mlswg/mls-implementations/issues/183
-				t.Skip("TODO")
-			}
 			testPassiveClient(t, &tc)
 		})
 	}
