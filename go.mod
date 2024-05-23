@@ -1,4 +1,4 @@
-module git.sr.ht/~emersion/go-mls
+module github.com/emersion/go-mls
 
 go 1.20
 

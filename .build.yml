@@ -2,7 +2,7 @@ image: alpine/latest
 packages:
   - go
 sources:
-  - https://git.sr.ht/~emersion/go-mls
+  - https://github.com/emersion/go-mls.git
 tasks:
   - build: |
       cd go-mls
