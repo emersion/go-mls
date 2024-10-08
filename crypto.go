@@ -21,21 +21,21 @@ const (
 )
 
 type Credential struct {
-	credentialType credentialType
-	identity       []byte   // for credentialTypeBasic
-	certificates   [][]byte // for credentialTypeX509
+	CredentialType credentialType
+	Identity       []byte   // for credentialTypeBasic
+	Certificates   [][]byte // for credentialTypeX509
 }
 
 func (cred *Credential) unmarshal(s *cryptobyte.String) error {
 	*cred = Credential{}
 
-	if !s.ReadUint16((*uint16)(&cred.credentialType)) {
+	if !s.ReadUint16((*uint16)(&cred.CredentialType)) {
 		return io.ErrUnexpectedEOF
 	}
 
-	switch cred.credentialType {
+	switch cred.CredentialType {
 	case CredentialTypeBasic:
-		if !readOpaqueVec(s, &cred.identity) {
+		if !readOpaqueVec(s, &cred.Identity) {
 			return io.ErrUnexpectedEOF
 		}
 		return nil
@@ -45,22 +45,22 @@ func (cred *Credential) unmarshal(s *cryptobyte.String) error {
 			if !readOpaqueVec(s, &cert) {
 				return io.ErrUnexpectedEOF
 			}
-			cred.certificates = append(cred.certificates, cert)
+			cred.Certificates = append(cred.Certificates, cert)
 			return nil
 		})
 	default:
-		return fmt.Errorf("mls: invalid credential type %d", cred.credentialType)
+		return fmt.Errorf("mls: invalid credential type %d", cred.CredentialType)
 	}
 }
 
 func (cred *Credential) marshal(b *cryptobyte.Builder) {
-	b.AddUint16(uint16(cred.credentialType))
-	switch cred.credentialType {
+	b.AddUint16(uint16(cred.CredentialType))
+	switch cred.CredentialType {
 	case CredentialTypeBasic:
-		writeOpaqueVec(b, cred.identity)
+		writeOpaqueVec(b, cred.Identity)
 	case CredentialTypeX509:
-		writeVector(b, len(cred.certificates), func(b *cryptobyte.Builder, i int) {
-			writeOpaqueVec(b, cred.certificates[i])
+		writeVector(b, len(cred.Certificates), func(b *cryptobyte.Builder, i int) {
+			writeOpaqueVec(b, cred.Certificates[i])
 		})
 	default:
 		panic("unreachable")
