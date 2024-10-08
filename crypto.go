@@ -16,30 +16,30 @@ type credentialType uint16
 
 // https://www.iana.org/assignments/mls/mls.xhtml#mls-credential-types
 const (
-	credentialTypeBasic credentialType = 0x0001
-	credentialTypeX509  credentialType = 0x0002
+	CredentialTypeBasic credentialType = 0x0001
+	CredentialTypeX509  credentialType = 0x0002
 )
 
-type credential struct {
+type Credential struct {
 	credentialType credentialType
 	identity       []byte   // for credentialTypeBasic
 	certificates   [][]byte // for credentialTypeX509
 }
 
-func (cred *credential) unmarshal(s *cryptobyte.String) error {
-	*cred = credential{}
+func (cred *Credential) unmarshal(s *cryptobyte.String) error {
+	*cred = Credential{}
 
 	if !s.ReadUint16((*uint16)(&cred.credentialType)) {
 		return io.ErrUnexpectedEOF
 	}
 
 	switch cred.credentialType {
-	case credentialTypeBasic:
+	case CredentialTypeBasic:
 		if !readOpaqueVec(s, &cred.identity) {
 			return io.ErrUnexpectedEOF
 		}
 		return nil
-	case credentialTypeX509:
+	case CredentialTypeX509:
 		return readVector(s, func(s *cryptobyte.String) error {
 			var cert []byte
 			if !readOpaqueVec(s, &cert) {
@@ -53,12 +53,12 @@ func (cred *credential) unmarshal(s *cryptobyte.String) error {
 	}
 }
 
-func (cred *credential) marshal(b *cryptobyte.Builder) {
+func (cred *Credential) marshal(b *cryptobyte.Builder) {
 	b.AddUint16(uint16(cred.credentialType))
 	switch cred.credentialType {
-	case credentialTypeBasic:
+	case CredentialTypeBasic:
 		writeOpaqueVec(b, cred.identity)
-	case credentialTypeX509:
+	case CredentialTypeX509:
 		writeVector(b, len(cred.certificates), func(b *cryptobyte.Builder, i int) {
 			writeOpaqueVec(b, cred.certificates[i])
 		})

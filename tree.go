@@ -266,7 +266,7 @@ func findExtensionData(exts []extension, t extensionType) []byte {
 type leafNode struct {
 	encryptionKey hpkePublicKey
 	signatureKey  signaturePublicKey
-	credential    credential
+	credential    Credential
 	capabilities  capabilities
 
 	leafNodeSource leafNodeSource
