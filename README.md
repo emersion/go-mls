@@ -1,7 +1,5 @@
 # go-mls
 
-[![builds.sr.ht status](https://builds.sr.ht/~emersion/go-mls/commits/master.svg)](https://builds.sr.ht/~emersion/go-mls/commits/master?)
-
 A Go library for [MLS].
 
 ## Contributing
