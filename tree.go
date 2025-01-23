@@ -266,7 +266,7 @@ func findExtensionData(exts []extension, t extensionType) []byte {
 type leafNode struct {
 	encryptionKey hpkePublicKey
 	signatureKey  signaturePublicKey
-	credential    credential
+	credential    Credential
 	capabilities  capabilities
 
 	leafNodeSource leafNodeSource
@@ -387,8 +387,8 @@ func (node *leafNode) verify(options *leafNodeVerifyOptions) error {
 
 	// TODO: check required_capabilities group extension
 
-	if _, ok := options.supportedCreds[node.credential.credentialType]; !ok {
-		return fmt.Errorf("mls: credential type %v used by leaf node not supported by all members", node.credential.credentialType)
+	if _, ok := options.supportedCreds[node.credential.CredentialType]; !ok {
+		return fmt.Errorf("mls: credential type %v used by leaf node not supported by all members", node.credential.CredentialType)
 	}
 
 	if node.lifetime != nil {

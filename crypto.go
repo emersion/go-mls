@@ -16,51 +16,51 @@ type credentialType uint16
 
 // https://www.iana.org/assignments/mls/mls.xhtml#mls-credential-types
 const (
-	credentialTypeBasic credentialType = 0x0001
-	credentialTypeX509  credentialType = 0x0002
+	CredentialTypeBasic credentialType = 0x0001
+	CredentialTypeX509  credentialType = 0x0002
 )
 
-type credential struct {
-	credentialType credentialType
-	identity       []byte   // for credentialTypeBasic
-	certificates   [][]byte // for credentialTypeX509
+type Credential struct {
+	CredentialType credentialType
+	Identity       []byte   // for credentialTypeBasic
+	Certificates   [][]byte // for credentialTypeX509
 }
 
-func (cred *credential) unmarshal(s *cryptobyte.String) error {
-	*cred = credential{}
+func (cred *Credential) unmarshal(s *cryptobyte.String) error {
+	*cred = Credential{}
 
-	if !s.ReadUint16((*uint16)(&cred.credentialType)) {
+	if !s.ReadUint16((*uint16)(&cred.CredentialType)) {
 		return io.ErrUnexpectedEOF
 	}
 
-	switch cred.credentialType {
-	case credentialTypeBasic:
-		if !readOpaqueVec(s, &cred.identity) {
+	switch cred.CredentialType {
+	case CredentialTypeBasic:
+		if !readOpaqueVec(s, &cred.Identity) {
 			return io.ErrUnexpectedEOF
 		}
 		return nil
-	case credentialTypeX509:
+	case CredentialTypeX509:
 		return readVector(s, func(s *cryptobyte.String) error {
 			var cert []byte
 			if !readOpaqueVec(s, &cert) {
 				return io.ErrUnexpectedEOF
 			}
-			cred.certificates = append(cred.certificates, cert)
+			cred.Certificates = append(cred.Certificates, cert)
 			return nil
 		})
 	default:
-		return fmt.Errorf("mls: invalid credential type %d", cred.credentialType)
+		return fmt.Errorf("mls: invalid credential type %d", cred.CredentialType)
 	}
 }
 
-func (cred *credential) marshal(b *cryptobyte.Builder) {
-	b.AddUint16(uint16(cred.credentialType))
-	switch cred.credentialType {
-	case credentialTypeBasic:
-		writeOpaqueVec(b, cred.identity)
-	case credentialTypeX509:
-		writeVector(b, len(cred.certificates), func(b *cryptobyte.Builder, i int) {
-			writeOpaqueVec(b, cred.certificates[i])
+func (cred *Credential) marshal(b *cryptobyte.Builder) {
+	b.AddUint16(uint16(cred.CredentialType))
+	switch cred.CredentialType {
+	case CredentialTypeBasic:
+		writeOpaqueVec(b, cred.Identity)
+	case CredentialTypeX509:
+		writeVector(b, len(cred.Certificates), func(b *cryptobyte.Builder, i int) {
+			writeOpaqueVec(b, cred.Certificates[i])
 		})
 	default:
 		panic("unreachable")
