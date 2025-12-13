@@ -31,6 +31,10 @@ func (pkg *KeyPackage) unmarshal(s *cryptobyte.String) error {
 		return io.ErrUnexpectedEOF
 	}
 
+	if pkg.version != protocolVersionMLS10 {
+		return fmt.Errorf("mls: invalid protocol version %d", pkg.version)
+	}
+
 	if err := pkg.leafNode.unmarshal(s); err != nil {
 		return err
 	}
