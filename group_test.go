@@ -116,7 +116,7 @@ func testMessageProtectionPub(t *testing.T, tc *messageProtectionTest, ctx *grou
 
 func verifyPublicMessage(t *testing.T, tc *messageProtectionTest, ctx *groupContext, pubMsg *publicMessage, wantRaw []byte) {
 	authContent := pubMsg.authenticatedContent()
-	if !authContent.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), ctx) {
+	if !authContent.verifySignature([]byte(tc.SignaturePub), ctx) {
 		t.Errorf("verifySignature() failed")
 	}
 	if !pubMsg.verifyMembershipTag(tc.CipherSuite, []byte(tc.MembershipKey), ctx) {
@@ -209,7 +209,7 @@ func decryptPrivateMessage(t *testing.T, tc *messageProtectionTest, ctx *groupCo
 	}
 
 	authContent := privMsg.authenticatedContent(senderData, content)
-	if !authContent.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), ctx) {
+	if !authContent.verifySignature([]byte(tc.SignaturePub), ctx) {
 		t.Errorf("verifySignature() failed")
 	}
 

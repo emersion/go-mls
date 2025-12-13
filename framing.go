@@ -310,8 +310,8 @@ func (authContent *authenticatedContent) framedContentTBS(ctx *groupContext) *fr
 	}
 }
 
-func (authContent *authenticatedContent) verifySignature(cs CipherSuite, verifKey []byte, ctx *groupContext) bool {
-	return authContent.auth.verifySignature(cs, verifKey, authContent.framedContentTBS(ctx))
+func (authContent *authenticatedContent) verifySignature(verifKey []byte, ctx *groupContext) bool {
+	return authContent.auth.verifySignature(ctx.cipherSuite, verifKey, authContent.framedContentTBS(ctx))
 }
 
 func (authContent *authenticatedContent) generateProposalRef(cs CipherSuite) (proposalRef, error) {

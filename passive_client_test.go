@@ -225,7 +225,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		}
 
 		authContent := pubMsg.authenticatedContent()
-		if !authContent.verifySignature(cs, []byte(senderNode.signatureKey), &groupCtx) {
+		if !authContent.verifySignature([]byte(senderNode.signatureKey), &groupCtx) {
 			t.Errorf("verifySignature() failed")
 		}
 
