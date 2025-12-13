@@ -585,6 +585,10 @@ func (n *node) encryptionKey() hpkePublicKey {
 	}
 }
 
+// ratchetTree is a ratchet tree represented as complete balanced binary tree,
+// stored with the array-based scheme described in appendix C.
+//
+// The length of the tree plus 1 is guaranteed to be a power of 2.
 type ratchetTree []*node
 
 func (tree *ratchetTree) unmarshal(s *cryptobyte.String) error {
