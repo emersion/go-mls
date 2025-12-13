@@ -226,6 +226,16 @@ func (w *Welcome) marshal(b *cryptobyte.Builder) {
 	writeOpaqueVec(b, w.encryptedGroupInfo)
 }
 
+// NewMembers returns the list of key package references this welcome message
+// contains secret keying information for.
+func (w *Welcome) NewMembers() []KeyPackageRef {
+	refs := make([]KeyPackageRef, len(w.secrets))
+	for i, sec := range w.secrets {
+		refs[i] = sec.newMember
+	}
+	return refs
+}
+
 func (w *Welcome) findSecret(ref KeyPackageRef) *encryptedGroupSecrets {
 	for i, sec := range w.secrets {
 		if sec.newMember.Equal(ref) {
