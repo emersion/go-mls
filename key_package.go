@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"time"
 
 	"golang.org/x/crypto/cryptobyte"
 )
@@ -160,4 +161,63 @@ type PrivateKeyPackage struct {
 type KeyPairPackage struct {
 	Public  KeyPackage
 	Private PrivateKeyPackage
+}
+
+// GenerateKeyPairPackage generates a new key pair package.
+func GenerateKeyPairPackage(cs CipherSuite) (*KeyPairPackage, error) {
+	// TODO: add options to configure the new key package
+
+	initPub, initPriv, err := cs.generateEncryptionKeyPair()
+	if err != nil {
+		return nil, err
+	}
+
+	encPub, encPriv, err := cs.generateEncryptionKeyPair()
+	if err != nil {
+		return nil, err
+	}
+
+	sigPub, sigPriv, err := cs.signatureScheme().GenerateKeyPair()
+	if err != nil {
+		return nil, err
+	}
+
+	keyPkg := KeyPackage{
+		version:     protocolVersionMLS10,
+		cipherSuite: cs,
+		initKey:     initPub,
+		leafNode: leafNode{
+			encryptionKey:  encPub,
+			signatureKey:   sigPub,
+			leafNodeSource: leafNodeSourceKeyPackage,
+			credential: credential{
+				credentialType: credentialTypeBasic,
+				identity:       []byte{},
+			},
+			capabilities: capabilities{
+				versions:     []protocolVersion{protocolVersionMLS10},
+				cipherSuites: []CipherSuite{cs},
+				extensions:   []extensionType{extensionTypeRatchetTree},
+				proposals:    []proposalType{proposalTypeAdd, proposalTypeUpdate, proposalTypeRemove},
+				credentials:  []credentialType{credentialTypeBasic},
+			},
+			lifetime: newLifetime(time.Now(), time.Now().Add(30*24*time.Hour)),
+		},
+	}
+
+	if err := keyPkg.leafNode.sign(cs, nil, 0, sigPriv); err != nil {
+		return nil, fmt.Errorf("failed to sign leaf node: %v", err)
+	}
+	if err := keyPkg.sign(sigPriv); err != nil {
+		return nil, fmt.Errorf("failed to sign key package: %v", err)
+	}
+
+	return &KeyPairPackage{
+		Public: keyPkg,
+		Private: PrivateKeyPackage{
+			InitKey:       initPriv,
+			EncryptionKey: encPriv,
+			SignatureKey:  sigPriv,
+		},
+	}, nil
 }
