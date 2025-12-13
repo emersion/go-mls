@@ -1053,7 +1053,7 @@ func (tree *ratchetTree) remove(li leafIndex) {
 	}
 
 	li = leafIndex(numLeaves - 1)
-	lastPowerOf2 := len(*tree)
+	lastPowerOf2 := len(*tree) + 1
 	for {
 		ni = li.nodeIndex()
 		if tree.get(ni) != nil {
@@ -1071,8 +1071,8 @@ func (tree *ratchetTree) remove(li leafIndex) {
 		li--
 	}
 
-	if lastPowerOf2 < len(*tree) {
-		*tree = (*tree)[:lastPowerOf2]
+	if lastPowerOf2 < len(*tree)+1 {
+		*tree = (*tree)[:lastPowerOf2-1]
 	}
 }
 
