@@ -24,6 +24,9 @@ type Group struct {
 	epochSecret           []byte
 	initSecret            []byte
 
+	myLeafIndex leafIndex
+	privTree    [][]byte
+
 	pendingProposals []pendingProposal
 }
 
@@ -123,6 +126,7 @@ func groupFromSecrets(welcome *Welcome, groupSecrets *groupSecrets, options *gro
 		pskSecret:             pskSecret,
 		epochSecret:           epochSecret,
 		initSecret:            initSecret,
+		// TODO: myLeafIndex, privTree
 	}, groupInfo, nil
 }
 
@@ -177,6 +181,164 @@ func (group *Group) processProposal(authContent *authenticatedContent) error {
 		sender:   authContent.content.sender.leafIndex,
 	})
 	return nil
+}
+
+func (group *Group) processCommit(authContent *authenticatedContent, newPSKSecret []byte, now func() time.Time) error {
+	cs := group.groupContext.cipherSuite
+	senderLeafIndex := authContent.content.sender.leafIndex
+
+	if authContent.content.contentType != contentTypeCommit {
+		panic("mls: expected a commit")
+	}
+	commit := authContent.content.commit
+
+	proposals, senders, err := resolveProposals(commit.proposals, senderLeafIndex, group.pendingProposals)
+	if err != nil {
+		return err
+	}
+
+	if err := verifyProposalList(proposals, senders, senderLeafIndex); err != nil {
+		return fmt.Errorf("failed to verify proposals: %v", err)
+	}
+	// TODO: additional proposal list checks
+
+	if proposalListNeedsPath(proposals) && commit.path == nil {
+		return fmt.Errorf("mls: commit is missing update path but required by proposal list")
+	}
+
+	newGroupCtx := group.groupContext
+	newGroupCtx.epoch++
+
+	newTree := make(ratchetTree, len(group.tree))
+	copy(newTree, group.tree)
+	newTree.apply(proposals, senders)
+
+	newPrivTree := make([][]byte, len(newTree))
+	for i := range group.tree {
+		if i < len(newPrivTree) {
+			newPrivTree[i] = group.privTree[i]
+		}
+	}
+
+	_, kdf, _ := cs.hpke().Params()
+	commitSecret := make([]byte, kdf.ExtractSize())
+	if commit.path != nil {
+		if commit.path.leafNode.leafNodeSource != leafNodeSourceCommit {
+			return fmt.Errorf("mls: commit path leaf node source must be commit")
+		}
+
+		// TODO: check tree length
+		senderNode := newTree.getLeaf(senderLeafIndex)
+
+		// The same signature key can be re-used, but the encryption key
+		// must change
+		signatureKeys, encryptionKeys := newTree.keys()
+		delete(signatureKeys, string(senderNode.signatureKey))
+		err := commit.path.leafNode.verify(&leafNodeVerifyOptions{
+			cipherSuite:    cs,
+			groupID:        group.groupContext.groupID,
+			leafIndex:      senderLeafIndex,
+			supportedCreds: newTree.supportedCreds(),
+			signatureKeys:  signatureKeys,
+			encryptionKeys: encryptionKeys,
+			now:            now,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to verify leaf node: %v", err)
+		}
+
+		for _, updateNode := range commit.path.nodes {
+			if _, dup := encryptionKeys[string(updateNode.encryptionKey)]; dup {
+				return fmt.Errorf("mls: encryption key in update path already used in ratchet tree")
+			}
+		}
+
+		if err := newTree.mergeUpdatePath(cs, senderLeafIndex, commit.path); err != nil {
+			return fmt.Errorf("failed to merge update path in ratchet tree: %v", err)
+		}
+
+		newGroupCtx.treeHash, err = newTree.computeRootTreeHash(cs)
+		if err != nil {
+			return fmt.Errorf("failed to compute root tree hash: %v", err)
+		}
+
+		// TODO: update group context extensions
+
+		commitSecret, err = newTree.decryptPathSecrets(cs, &newGroupCtx, senderLeafIndex, group.myLeafIndex, commit.path, newPrivTree)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt path secrets: %v", err)
+		}
+	} else {
+		// TODO: only recompute parts of the tree affected by proposals
+		newGroupCtx.treeHash, err = newTree.computeRootTreeHash(cs)
+		if err != nil {
+			return fmt.Errorf("failed to compute root tree hash: %v", err)
+		}
+	}
+
+	newGroupCtx.confirmedTranscriptHash, err = authContent.confirmedTranscriptHashInput().hash(cs, group.interimTranscriptHash)
+	if err != nil {
+		return fmt.Errorf("failed to hash confirmed transcript hash input: %v", err)
+	}
+
+	newInterimTranscriptHash, err := nextInterimTranscriptHash(cs, newGroupCtx.confirmedTranscriptHash, authContent.auth.confirmationTag)
+	if err != nil {
+		return fmt.Errorf("failed to compute next interim transcript hash: %v", err)
+	}
+
+	newJoinerSecret, err := newGroupCtx.extractJoinerSecret(group.initSecret, commitSecret)
+	if err != nil {
+		return fmt.Errorf("failed to extract joined secret: %v", err)
+	}
+
+	newEpochSecret, err := newGroupCtx.extractEpochSecret(newJoinerSecret, newPSKSecret)
+	if err != nil {
+		return fmt.Errorf("failed to extract epoch secret: %v", err)
+	}
+
+	newInitSecret, err := cs.deriveSecret(newEpochSecret, secretLabelInit)
+	if err != nil {
+		return fmt.Errorf("failed to erive init secret: %v", err)
+	}
+
+	group.tree = newTree
+	group.privTree = newPrivTree
+	group.groupContext = newGroupCtx
+	group.interimTranscriptHash = newInterimTranscriptHash
+	group.pskSecret = newPSKSecret
+	group.epochSecret = newEpochSecret
+	group.initSecret = newInitSecret
+	group.pendingProposals = nil // TODO: only clear proposals we've consumed
+	return nil
+}
+
+func resolveProposals(proposalOrRefs []proposalOrRef, senderLeafIndex leafIndex, pendingProposals []pendingProposal) ([]proposal, []leafIndex, error) {
+	var (
+		proposals []proposal
+		senders   []leafIndex
+	)
+	for _, propOrRef := range proposalOrRefs {
+		switch propOrRef.typ {
+		case proposalOrRefTypeProposal:
+			proposals = append(proposals, *propOrRef.proposal)
+			senders = append(senders, senderLeafIndex)
+		case proposalOrRefTypeReference:
+			var found bool
+			for _, pp := range pendingProposals {
+				if pp.ref.Equal(propOrRef.reference) {
+					found = true
+					proposals = append(proposals, *pp.proposal)
+					senders = append(senders, pp.sender)
+					break
+				}
+			}
+			if !found {
+				return nil, nil, fmt.Errorf("mls: cannot find proposal reference: %v", propOrRef.reference)
+			}
+		}
+	}
+
+	return proposals, senders, nil
 }
 
 type commit struct {

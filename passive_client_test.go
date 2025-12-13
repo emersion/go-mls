@@ -119,12 +119,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Errorf("deriveSecret(authentication) = %v, want %v", epochAuthenticator, tc.InitialEpochAuthenticator)
 	}
 
-	groupCtx := group.groupContext
 	tree := group.tree
-	epochSecret := group.epochSecret
-	interimTranscriptHash := group.interimTranscriptHash
-	initSecret := group.initSecret
-	pskSecret := group.pskSecret
 
 	myLeafIndex, ok := tree.findLeaf(&keyPkg.leafNode)
 	if !ok {
@@ -133,6 +128,9 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 
 	privTree := make([][]byte, len(tree))
 	privTree[int(myLeafIndex.nodeIndex())] = encryptionPriv
+
+	group.privTree = privTree
+	group.myLeafIndex = myLeafIndex
 
 	if groupSecrets.pathSecret != nil {
 		nodeIndex := commonAncestor(myLeafIndex.nodeIndex(), groupInfo.signer.nodeIndex())
@@ -196,43 +194,13 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 			t.Errorf("verifyPublicMessage() = %v", err)
 		}
 		senderLeafIndex := pubMsg.content.sender.leafIndex
-		senderNode := tree.getLeaf(senderLeafIndex)
 
 		if authContent.content.contentType != contentTypeCommit {
 			t.Errorf("contentType = %v, want %v", authContent.content.contentType, contentTypeCommit)
 		}
 		commit := authContent.content.commit
 
-		var (
-			proposals []proposal
-			senders   []leafIndex
-		)
-		for _, propOrRef := range commit.proposals {
-			switch propOrRef.typ {
-			case proposalOrRefTypeProposal:
-				proposals = append(proposals, *propOrRef.proposal)
-				senders = append(senders, senderLeafIndex)
-			case proposalOrRefTypeReference:
-				var found bool
-				for _, pp := range group.pendingProposals {
-					if pp.ref.Equal(propOrRef.reference) {
-						found = true
-						proposals = append(proposals, *pp.proposal)
-						senders = append(senders, pp.sender)
-						break
-					}
-				}
-				if !found {
-					t.Fatalf("cannot find proposal reference %v", propOrRef.reference)
-				}
-			}
-		}
-
-		if err := verifyProposalList(proposals, senders, senderLeafIndex); err != nil {
-			t.Errorf("verifyProposals() = %v", err)
-		}
-		// TODO: additional proposal list checks
-
+		proposals, _, err := resolveProposals(commit.proposals, senderLeafIndex, group.pendingProposals)
 		for _, prop := range proposals {
 			switch prop.proposalType {
 			case proposalTypeAdd, proposalTypeRemove, proposalTypeUpdate:
@@ -242,21 +210,6 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 			default:
 				t.Skipf("TODO: proposal type = %v", prop.proposalType)
 			}
-		}
-
-		newTree := make(ratchetTree, len(tree))
-		copy(newTree, tree)
-		newTree.apply(proposals, senders)
-
-		newPrivTree := make([][]byte, len(newTree))
-		for i := range tree {
-			if i < len(newPrivTree) {
-				newPrivTree[i] = privTree[i]
-			}
-		}
-
-		if proposalListNeedsPath(proposals) && commit.path == nil {
-			t.Errorf("proposal list needs update path")
 		}
 
 		var (
@@ -287,124 +240,16 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 			}
 		}
 
-		newGroupCtx := groupCtx
-		newGroupCtx.epoch++
-
-		_, kdf, _ := cs.hpke().Params()
-		commitSecret := make([]byte, kdf.ExtractSize())
-		if commit.path != nil {
-			if commit.path.leafNode.leafNodeSource != leafNodeSourceCommit {
-				t.Errorf("commit path leaf node source must be commit")
-			}
-
-			// The same signature key can be re-used, but the encryption key
-			// must change
-			signatureKeys, encryptionKeys := newTree.keys()
-			delete(signatureKeys, string(senderNode.signatureKey))
-			err := commit.path.leafNode.verify(&leafNodeVerifyOptions{
-				cipherSuite:    cs,
-				groupID:        groupCtx.groupID,
-				leafIndex:      senderLeafIndex,
-				supportedCreds: newTree.supportedCreds(),
-				signatureKeys:  signatureKeys,
-				encryptionKeys: encryptionKeys,
-				now:            func() time.Time { return time.Time{} },
-			})
-			if err != nil {
-				t.Errorf("leafNode.verify() = %v", err)
-			}
-
-			for _, updateNode := range commit.path.nodes {
-				if _, dup := encryptionKeys[string(updateNode.encryptionKey)]; dup {
-					t.Errorf("encryption key in update path already used in ratchet tree")
-					break
-				}
-			}
-
-			if err := newTree.mergeUpdatePath(cs, senderLeafIndex, commit.path); err != nil {
-				t.Errorf("ratchetTree.mergeUpdatePath() = %v", err)
-			}
-
-			newGroupCtx.treeHash, err = newTree.computeRootTreeHash(cs)
-			if err != nil {
-				t.Fatalf("ratchetTree.computeRootTreeHash() = %v", err)
-			}
-
-			// TODO: update group context extensions
-
-			commitSecret, err = newTree.decryptPathSecrets(cs, &newGroupCtx, senderLeafIndex, myLeafIndex, commit.path, newPrivTree)
-			if err != nil {
-				t.Fatalf("ratchetTree.decryptPathSecrets() = %v", err)
-			}
-		} else {
-			// TODO: only recompute parts of the tree affected by proposals
-			newGroupCtx.treeHash, err = newTree.computeRootTreeHash(cs)
-			if err != nil {
-				t.Fatalf("ratchetTree.computeRootTreeHash() = %v", err)
-			}
-		}
-
-		newGroupCtx.confirmedTranscriptHash, err = authContent.confirmedTranscriptHashInput().hash(cs, interimTranscriptHash)
-		if err != nil {
-			t.Fatalf("confirmedTranscriptHashInput.hash() = %v", err)
-		}
-
-		newInterimTranscriptHash, err := nextInterimTranscriptHash(cs, newGroupCtx.confirmedTranscriptHash, authContent.auth.confirmationTag)
-		if err != nil {
-			t.Fatalf("nextInterimTranscriptHash() = %v", err)
-		}
-
 		newPSKSecret, err := extractPSKSecret(cs, pskIDs, psks)
 		if err != nil {
 			t.Fatalf("extractPSKSecret() = %v", err)
 		}
 
-		newJoinerSecret, err := newGroupCtx.extractJoinerSecret(initSecret, commitSecret)
+		err = group.processCommit(authContent, newPSKSecret, disableLifetimeCheck)
 		if err != nil {
-			t.Fatalf("groupContext.extractJoinerSecret() = %v", err)
+			t.Errorf("processCommit() = %v", err)
 		}
-
-		newEpochSecret, err := newGroupCtx.extractEpochSecret(newJoinerSecret, newPSKSecret)
-		if err != nil {
-			t.Fatalf("groupContext.extractEpochSecret() = %v", err)
-		}
-		epochAuthenticator, err := cs.deriveSecret(newEpochSecret, secretLabelAuthentication)
-		if err != nil {
-			t.Fatalf("deriveSecret(authentication) = %v", err)
-		} else if !bytes.Equal(epochAuthenticator, []byte(epoch.EpochAuthenticator)) {
-			t.Errorf("deriveSecret(authentication) = %v, want %v", epochAuthenticator, epoch.EpochAuthenticator)
-		}
-
-		newInitSecret, err := cs.deriveSecret(newEpochSecret, secretLabelInit)
-		if err != nil {
-			t.Fatalf("deriveSecret(init) = %v", err)
-		}
-
-		confirmationKey, err := cs.deriveSecret(newEpochSecret, secretLabelConfirm)
-		if err != nil {
-			t.Fatalf("deriveSecret(confirm) = %v", err)
-		}
-		confirmationTag := cs.signMAC(confirmationKey, newGroupCtx.confirmedTranscriptHash)
-		if !bytes.Equal(confirmationTag, authContent.auth.confirmationTag) {
-			t.Errorf("invalid confirmation tag: got %v, want %v", confirmationTag, authContent.auth.confirmationTag)
-		}
-
-		group.pendingProposals = nil
-
-		tree = newTree
-		privTree = newPrivTree
-		groupCtx = newGroupCtx
-		interimTranscriptHash = newInterimTranscriptHash
-		pskSecret = newPSKSecret
-		epochSecret = newEpochSecret
-		initSecret = newInitSecret
-
-		group.tree = tree
-		group.groupContext = groupCtx
-		group.epochSecret = epochSecret
 	}
-
-	_ = pskSecret
 }
 
 func checkEncryptionKeyPair(cs CipherSuite, pub, priv []byte) error {
