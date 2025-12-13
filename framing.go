@@ -1,6 +1,7 @@
 package mls
 
 import (
+	"bytes"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -126,6 +127,11 @@ func (wf wireFormat) marshal(b *cryptobyte.Builder) {
 
 // GroupID is an application-specific group identifier.
 type GroupID []byte
+
+// Equal checks whether two key package references are equal.
+func (ref GroupID) Equal(other GroupID) bool {
+	return bytes.Equal([]byte(ref), []byte(other))
+}
 
 type framedContent struct {
 	groupID           GroupID
