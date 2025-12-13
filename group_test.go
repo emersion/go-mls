@@ -278,3 +278,21 @@ func TestMessageProtection(t *testing.T) {
 		})
 	}
 }
+
+func TestGroup(t *testing.T) {
+	cs := CipherSuiteMLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
+
+	aliceKeyPairPkg, err := GenerateKeyPairPackage(cs)
+	if err != nil {
+		t.Fatalf("GenerateKeyPairPackage() = %v", err)
+	}
+
+	bobKeyPairPkg, err := GenerateKeyPairPackage(cs)
+	if err != nil {
+		t.Fatalf("GenerateKeyPairPackage() = %v", err)
+	}
+
+	_ = aliceKeyPairPkg
+	_ = bobKeyPairPkg
+	// TODO
+}
