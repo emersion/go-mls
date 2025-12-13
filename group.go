@@ -180,6 +180,36 @@ func processPathSecret(cs CipherSuite, tree ratchetTree, privTree [][]byte, path
 	return nil
 }
 
+// UnmarshalAndProcessMessage decodes a raw MLS message intended for the group
+// and processes it.
+func (group *Group) UnmarshalAndProcessMessage(raw []byte) error {
+	var msg mlsMessage
+	if err := unmarshal([]byte(raw), &msg); err != nil {
+		return fmt.Errorf("failed to unmarshal MLS message: %v", err)
+	} else if msg.wireFormat != wireFormatMLSPublicMessage {
+		// TODO: support other wire formats
+		return fmt.Errorf("mls: unsupported wire format: %v", msg.wireFormat)
+	}
+	pubMsg := msg.publicMessage
+
+	authContent, err := group.verifyPublicMessage(pubMsg)
+	if err != nil {
+		return fmt.Errorf("failed to verify public message: %v", err)
+	}
+
+	switch authContent.content.contentType {
+	case contentTypeProposal:
+		return group.processProposal(authContent)
+	case contentTypeCommit:
+		return group.processCommit(authContent, nil, nil, nil)
+	case contentTypeApplication:
+		return fmt.Errorf("mls: application content type must be encrypted")
+	default:
+		// TODO: support other content types
+		return fmt.Errorf("mls: unsupported content type: %v", authContent.content.contentType)
+	}
+}
+
 func (group *Group) verifyPublicMessage(pubMsg *publicMessage) (*authenticatedContent, error) {
 	if !pubMsg.content.groupID.Equal(group.groupContext.groupID) {
 		return nil, fmt.Errorf("mls: message group ID mismatch")
@@ -233,7 +263,7 @@ func (group *Group) processProposal(authContent *authenticatedContent) error {
 	return nil
 }
 
-func (group *Group) processCommit(authContent *authenticatedContent, newPSKSecret []byte, now func() time.Time) error {
+func (group *Group) processCommit(authContent *authenticatedContent, pskIDs []preSharedKeyID, psks [][]byte, now func() time.Time) error {
 	cs := group.groupContext.cipherSuite
 	senderLeafIndex := authContent.content.sender.leafIndex
 
@@ -338,6 +368,11 @@ func (group *Group) processCommit(authContent *authenticatedContent, newPSKSecre
 	newJoinerSecret, err := newGroupCtx.extractJoinerSecret(group.initSecret, commitSecret)
 	if err != nil {
 		return fmt.Errorf("failed to extract joined secret: %v", err)
+	}
+
+	newPSKSecret, err := extractPSKSecret(cs, pskIDs, psks)
+	if err != nil {
+		return fmt.Errorf("failed to extract PSK secret: %v", err)
 	}
 
 	newEpochSecret, err := newGroupCtx.extractEpochSecret(newJoinerSecret, newPSKSecret)
