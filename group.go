@@ -545,14 +545,27 @@ func (sec *groupSecrets) verifySingleReinitOrBranchPSK() bool {
 	return n <= 1
 }
 
-type welcome struct {
+// A Welcome message includes secret keying information necessary to join a
+// group.
+type Welcome struct {
 	cipherSuite        CipherSuite
 	secrets            []encryptedGroupSecrets
 	encryptedGroupInfo []byte
 }
 
-func (w *welcome) unmarshal(s *cryptobyte.String) error {
-	*w = welcome{}
+// UnmarshalWelcome reads a welcome message.
+func UnmarshalWelcome(raw []byte) (*Welcome, error) {
+	var msg mlsMessage
+	if err := unmarshal(raw, &msg); err != nil {
+		return nil, err
+	} else if msg.wireFormat != wireFormatMLSWelcome {
+		return nil, fmt.Errorf("mls: expected a key package message, got wire format %v", msg.wireFormat)
+	}
+	return msg.welcome, nil
+}
+
+func (w *Welcome) unmarshal(s *cryptobyte.String) error {
+	*w = Welcome{}
 
 	if !s.ReadUint16((*uint16)(&w.cipherSuite)) {
 		return io.ErrUnexpectedEOF
@@ -577,7 +590,7 @@ func (w *welcome) unmarshal(s *cryptobyte.String) error {
 	return nil
 }
 
-func (w *welcome) marshal(b *cryptobyte.Builder) {
+func (w *Welcome) marshal(b *cryptobyte.Builder) {
 	b.AddUint16(uint16(w.cipherSuite))
 	writeVector(b, len(w.secrets), func(b *cryptobyte.Builder, i int) {
 		w.secrets[i].marshal(b)
@@ -585,7 +598,7 @@ func (w *welcome) marshal(b *cryptobyte.Builder) {
 	writeOpaqueVec(b, w.encryptedGroupInfo)
 }
 
-func (w *welcome) findSecret(ref keyPackageRef) *encryptedGroupSecrets {
+func (w *Welcome) findSecret(ref keyPackageRef) *encryptedGroupSecrets {
 	for i, sec := range w.secrets {
 		if sec.newMember.Equal(ref) {
 			return &w.secrets[i]
@@ -594,7 +607,7 @@ func (w *welcome) findSecret(ref keyPackageRef) *encryptedGroupSecrets {
 	return nil
 }
 
-func (w *welcome) decryptGroupSecrets(ref keyPackageRef, initKeyPriv []byte) (*groupSecrets, error) {
+func (w *Welcome) decryptGroupSecrets(ref keyPackageRef, initKeyPriv []byte) (*groupSecrets, error) {
 	cs := w.cipherSuite
 
 	sec := w.findSecret(ref)
@@ -614,7 +627,7 @@ func (w *welcome) decryptGroupSecrets(ref keyPackageRef, initKeyPriv []byte) (*g
 	return &groupSecrets, err
 }
 
-func (w *welcome) decryptGroupInfo(joinerSecret, pskSecret []byte) (*groupInfo, error) {
+func (w *Welcome) decryptGroupInfo(joinerSecret, pskSecret []byte) (*groupInfo, error) {
 	cs := w.cipherSuite
 	_, _, aead := cs.hpke().Params()
 

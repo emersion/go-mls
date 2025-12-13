@@ -49,11 +49,10 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Skip("TODO: kem.Scheme().SeedSize() != kdf.ExtractSize()")
 	}
 
-	msg, err := unmarshalMLSMessage(tc.Welcome, wireFormatMLSWelcome)
+	welcome, err := UnmarshalWelcome(tc.Welcome)
 	if err != nil {
-		t.Fatalf("unmarshal(welcome) = %v", err)
+		t.Fatalf("UnmarshalWelcome() = %v", err)
 	}
-	welcome := msg.welcome
 	if welcome.cipherSuite != cs {
 		t.Fatalf("welcome.cipherSuite = %v, want %v", welcome.cipherSuite, cs)
 	}
@@ -478,16 +477,6 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		epochSecret = newEpochSecret
 		initSecret = newInitSecret
 	}
-}
-
-func unmarshalMLSMessage(raw testBytes, wf wireFormat) (*mlsMessage, error) {
-	var msg mlsMessage
-	if err := unmarshal([]byte(raw), &msg); err != nil {
-		return nil, err
-	} else if msg.wireFormat != wf {
-		return nil, fmt.Errorf("invalid wireFormat: got %v, want %v", msg.wireFormat, wf)
-	}
-	return &msg, nil
 }
 
 func checkEncryptionKeyPair(cs CipherSuite, pub, priv []byte) error {

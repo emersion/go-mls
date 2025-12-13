@@ -195,7 +195,7 @@ type mlsMessage struct {
 	wireFormat     wireFormat
 	publicMessage  *publicMessage  // for wireFormatMLSPublicMessage
 	privateMessage *privateMessage // for wireFormatMLSPrivateMessage
-	welcome        *welcome        // for wireFormatMLSWelcome
+	welcome        *Welcome        // for wireFormatMLSWelcome
 	groupInfo      *groupInfo      // for wireFormatMLSGroupInfo
 	keyPackage     *KeyPackage     // for wireFormatMLSKeyPackage
 }
@@ -222,7 +222,7 @@ func (msg *mlsMessage) unmarshal(s *cryptobyte.String) error {
 		msg.privateMessage = new(privateMessage)
 		return msg.privateMessage.unmarshal(s)
 	case wireFormatMLSWelcome:
-		msg.welcome = new(welcome)
+		msg.welcome = new(Welcome)
 		return msg.welcome.unmarshal(s)
 	case wireFormatMLSGroupInfo:
 		msg.groupInfo = new(groupInfo)
