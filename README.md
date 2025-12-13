@@ -2,6 +2,9 @@
 
 A Go library for [MLS].
 
+This library is a **work-in-progress** and has not yet been audited for
+security issues.
+
 ## Contributing
 
 Send patches on [GitHub]. Come and discuss in [#emersion on Libera Chat].
