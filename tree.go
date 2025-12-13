@@ -184,6 +184,13 @@ type lifetime struct {
 	notBefore, notAfter uint64
 }
 
+func newLifetime(notBefore, notAfter time.Time) *lifetime {
+	return &lifetime{
+		notBefore: uint64(notBefore.Unix()),
+		notAfter:  uint64(notAfter.Unix()),
+	}
+}
+
 func (lt *lifetime) unmarshal(s *cryptobyte.String) error {
 	*lt = lifetime{}
 	if !s.ReadUint64(&lt.notBefore) || !s.ReadUint64(&lt.notAfter) {
