@@ -31,8 +31,13 @@ type Group struct {
 }
 
 // GroupFromWelcome creates a new group from a welcome message.
-func GroupFromWelcome(welcome *Welcome, keyPkgRef KeyPackageRef, initKeyPriv []byte) (*Group, error) {
-	groupSecrets, err := welcome.decryptGroupSecrets(keyPkgRef, initKeyPriv)
+func GroupFromWelcome(welcome *Welcome, keyPairPkg *KeyPairPackage) (*Group, error) {
+	keyPkgRef, err := keyPairPkg.Public.GenerateRef()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate key package ref: %v", err)
+	}
+
+	groupSecrets, err := welcome.decryptGroupSecrets(keyPkgRef, keyPairPkg.Private.InitKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt group secrets: %v", err)
 	}
@@ -45,8 +50,7 @@ func GroupFromWelcome(welcome *Welcome, keyPkgRef KeyPackageRef, initKeyPriv []b
 		return nil, fmt.Errorf("mls: group secret PSKs are not yet supported")
 	}
 
-	group, _, err := groupFromSecrets(welcome, groupSecrets, nil)
-	return group, err
+	return groupFromSecrets(welcome, keyPairPkg, groupSecrets, nil)
 }
 
 type groupFromSecretsOptions struct {
@@ -55,19 +59,19 @@ type groupFromSecretsOptions struct {
 	now     func() time.Time
 }
 
-func groupFromSecrets(welcome *Welcome, groupSecrets *groupSecrets, options *groupFromSecretsOptions) (*Group, *groupInfo, error) {
+func groupFromSecrets(welcome *Welcome, keyPairPkg *KeyPairPackage, groupSecrets *groupSecrets, options *groupFromSecretsOptions) (*Group, error) {
 	if options == nil {
 		options = new(groupFromSecretsOptions)
 	}
 
 	pskSecret, err := extractPSKSecret(welcome.cipherSuite, groupSecrets.psks, options.psks)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to extract PSK secret: %v", err)
+		return nil, fmt.Errorf("failed to extract PSK secret: %v", err)
 	}
 
 	groupInfo, err := welcome.decryptGroupInfo(groupSecrets.joinerSecret, pskSecret)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to decrypt group info: %v", err)
+		return nil, fmt.Errorf("failed to decrypt group info: %v", err)
 	}
 
 	rawTree := options.rawTree
@@ -75,29 +79,29 @@ func groupFromSecrets(welcome *Welcome, groupSecrets *groupSecrets, options *gro
 		rawTree = findExtensionData(groupInfo.extensions, extensionTypeRatchetTree)
 	}
 	if rawTree == nil {
-		return nil, nil, fmt.Errorf("mls: missing ratchet tree")
+		return nil, fmt.Errorf("mls: missing ratchet tree")
 	}
 
 	var tree ratchetTree
 	if err := unmarshal(rawTree, &tree); err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal ratchet tree: %v", err)
+		return nil, fmt.Errorf("failed to unmarshal ratchet tree: %v", err)
 	}
 
 	signerNode := tree.getLeaf(groupInfo.signer)
 	if signerNode == nil {
-		return nil, nil, fmt.Errorf("mls: signer node is blank")
+		return nil, fmt.Errorf("mls: signer node is blank")
 	} else if !groupInfo.verifySignature(signerNode.signatureKey) {
-		return nil, nil, fmt.Errorf("mls: failed to verify signer node signature")
+		return nil, fmt.Errorf("mls: failed to verify signer node signature")
 	}
 	if !groupInfo.verifyConfirmationTag(groupSecrets.joinerSecret, pskSecret) {
-		return nil, nil, fmt.Errorf("mls: failed to verify confirmation tag")
+		return nil, fmt.Errorf("mls: failed to verify confirmation tag")
 	}
 	if groupInfo.groupContext.cipherSuite != welcome.cipherSuite {
-		return nil, nil, fmt.Errorf("mls: group info cipher suite doesn't match key package")
+		return nil, fmt.Errorf("mls: group info cipher suite doesn't match key package")
 	}
 
 	if err := tree.verifyIntegrity(&groupInfo.groupContext, options.now); err != nil {
-		return nil, nil, fmt.Errorf("failed to verify ratchet tree integrity: %v", err)
+		return nil, fmt.Errorf("failed to verify ratchet tree integrity: %v", err)
 	}
 
 	// TODO: perform other group info verification steps
@@ -106,17 +110,33 @@ func groupFromSecrets(welcome *Welcome, groupSecrets *groupSecrets, options *gro
 
 	epochSecret, err := groupCtx.extractEpochSecret(groupSecrets.joinerSecret, pskSecret)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to extract epoch secret: %v", err)
+		return nil, fmt.Errorf("failed to extract epoch secret: %v", err)
 	}
 
 	initSecret, err := groupCtx.cipherSuite.deriveSecret(epochSecret, secretLabelInit)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to derive init secret: %v", err)
+		return nil, fmt.Errorf("failed to derive init secret: %v", err)
 	}
 
 	interimTranscriptHash, err := nextInterimTranscriptHash(groupCtx.cipherSuite, groupCtx.confirmedTranscriptHash, groupInfo.confirmationTag)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to compute next interim transcript hash: %v", err)
+		return nil, fmt.Errorf("failed to compute next interim transcript hash: %v", err)
+	}
+
+	myLeafIndex, ok := tree.findLeaf(&keyPairPkg.Public.leafNode)
+	if !ok {
+		return nil, fmt.Errorf("mls: failed to find my leaf node in ratchet tree")
+	}
+
+	privTree := make([][]byte, len(tree))
+	privTree[int(myLeafIndex.nodeIndex())] = keyPairPkg.Private.EncryptionKey
+
+	if groupSecrets.pathSecret != nil {
+		nodeIndex := commonAncestor(myLeafIndex.nodeIndex(), groupInfo.signer.nodeIndex())
+		err := processPathSecret(groupCtx.cipherSuite, tree, privTree, groupSecrets.pathSecret, nodeIndex)
+		if err != nil {
+			return nil, fmt.Errorf("failed to process path secret: %v", err)
+		}
 	}
 
 	return &Group{
@@ -126,8 +146,38 @@ func groupFromSecrets(welcome *Welcome, groupSecrets *groupSecrets, options *gro
 		pskSecret:             pskSecret,
 		epochSecret:           epochSecret,
 		initSecret:            initSecret,
-		// TODO: myLeafIndex, privTree
-	}, groupInfo, nil
+		myLeafIndex:           myLeafIndex,
+		privTree:              privTree,
+	}, nil
+}
+
+func processPathSecret(cs CipherSuite, tree ratchetTree, privTree [][]byte, pathSecret []byte, nodeIndex nodeIndex) error {
+	nodePriv, err := nodePrivFromPathSecret(cs, pathSecret, tree.get(nodeIndex).encryptionKey())
+	if err != nil {
+		return fmt.Errorf("failed to derive node %v private key from path secret: %v", nodeIndex, err)
+	}
+	privTree[int(nodeIndex)] = nodePriv
+
+	for {
+		var ok bool
+		nodeIndex, ok = tree.numLeaves().parent(nodeIndex)
+		if !ok {
+			break
+		}
+
+		pathSecret, err := cs.deriveSecret(pathSecret, []byte("path"))
+		if err != nil {
+			return fmt.Errorf("failed to derive path secret: %v", err)
+		}
+
+		nodePriv, err := nodePrivFromPathSecret(cs, pathSecret, tree.get(nodeIndex).encryptionKey())
+		if err != nil {
+			return fmt.Errorf("failed to derive node %v private key from path secret: %v", nodeIndex, err)
+		}
+		privTree[int(nodeIndex)] = nodePriv
+	}
+
+	return nil
 }
 
 func (group *Group) verifyPublicMessage(pubMsg *publicMessage) (*authenticatedContent, error) {

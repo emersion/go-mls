@@ -131,3 +131,16 @@ type KeyPackageRef []byte
 func (ref KeyPackageRef) Equal(other KeyPackageRef) bool {
 	return bytes.Equal([]byte(ref), []byte(other))
 }
+
+// PrivateKeyPackage holds private information about a user.
+type PrivateKeyPackage struct {
+	InitKey       []byte
+	EncryptionKey []byte
+	SignatureKey  []byte
+}
+
+// KeyPairPackage holds both public and private information about a user.
+type KeyPairPackage struct {
+	Public  KeyPackage
+	Private PrivateKeyPackage
+}

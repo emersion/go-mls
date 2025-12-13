@@ -102,8 +102,16 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		}
 	}
 
+	keyPairPkg := KeyPairPackage{
+		Public: *keyPkg,
+		Private: PrivateKeyPackage{
+			InitKey:       initPriv,
+			EncryptionKey: encryptionPriv,
+			SignatureKey:  signaturePriv,
+		},
+	}
 	disableLifetimeCheck := func() time.Time { return time.Time{} }
-	group, groupInfo, err := groupFromSecrets(welcome, groupSecrets, &groupFromSecretsOptions{
+	group, err := groupFromSecrets(welcome, &keyPairPkg, groupSecrets, &groupFromSecretsOptions{
 		rawTree: []byte(tc.RatchetTree),
 		psks:    psks,
 		now:     disableLifetimeCheck,
@@ -117,47 +125,6 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Errorf("deriveSecret(authentication) = %v", err)
 	} else if !bytes.Equal(epochAuthenticator, []byte(tc.InitialEpochAuthenticator)) {
 		t.Errorf("deriveSecret(authentication) = %v, want %v", epochAuthenticator, tc.InitialEpochAuthenticator)
-	}
-
-	tree := group.tree
-
-	myLeafIndex, ok := tree.findLeaf(&keyPkg.leafNode)
-	if !ok {
-		t.Errorf("tree.findLeaf() = false")
-	}
-
-	privTree := make([][]byte, len(tree))
-	privTree[int(myLeafIndex.nodeIndex())] = encryptionPriv
-
-	group.privTree = privTree
-	group.myLeafIndex = myLeafIndex
-
-	if groupSecrets.pathSecret != nil {
-		nodeIndex := commonAncestor(myLeafIndex.nodeIndex(), groupInfo.signer.nodeIndex())
-		nodePriv, err := nodePrivFromPathSecret(cs, groupSecrets.pathSecret, tree.get(nodeIndex).encryptionKey())
-		if err != nil {
-			t.Fatalf("failed to derive node %v private key from path secret: %v", nodeIndex, err)
-		}
-		privTree[int(nodeIndex)] = nodePriv
-
-		pathSecret := groupSecrets.pathSecret
-		for {
-			nodeIndex, ok = tree.numLeaves().parent(nodeIndex)
-			if !ok {
-				break
-			}
-
-			pathSecret, err := cs.deriveSecret(pathSecret, []byte("path"))
-			if err != nil {
-				t.Fatalf("deriveSecret(pathSecret[n-1]) = %v", err)
-			}
-
-			nodePriv, err := nodePrivFromPathSecret(cs, pathSecret, tree.get(nodeIndex).encryptionKey())
-			if err != nil {
-				t.Fatalf("failed to derive node %v private key from path secret: %v", nodeIndex, err)
-			}
-			privTree[int(nodeIndex)] = nodePriv
-		}
 	}
 
 	for i, epoch := range tc.Epochs {
