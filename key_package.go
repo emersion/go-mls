@@ -21,6 +21,17 @@ type KeyPackage struct {
 	signature   []byte
 }
 
+// UnmarshalKeyPackage reads a key package encoded as an MLS message.
+func UnmarshalKeyPackage(raw []byte) (*KeyPackage, error) {
+	var msg mlsMessage
+	if err := unmarshal(raw, &msg); err != nil {
+		return nil, err
+	} else if msg.wireFormat != wireFormatMLSKeyPackage {
+		return nil, fmt.Errorf("mls: expected a key package message, got wire format %v", msg.wireFormat)
+	}
+	return msg.keyPackage, nil
+}
+
 func (pkg *KeyPackage) unmarshal(s *cryptobyte.String) error {
 	*pkg = KeyPackage{}
 

@@ -58,11 +58,10 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Fatalf("welcome.cipherSuite = %v, want %v", welcome.cipherSuite, cs)
 	}
 
-	msg, err = unmarshalMLSMessage(tc.KeyPackage, wireFormatMLSKeyPackage)
+	keyPkg, err := UnmarshalKeyPackage([]byte(tc.KeyPackage))
 	if err != nil {
-		t.Fatalf("unmarshal(keyPackage) = %v", err)
+		t.Fatalf("UnmarshalKeyPackage() = %v", err)
 	}
-	keyPkg := msg.keyPackage
 	if keyPkg.cipherSuite != welcome.cipherSuite {
 		t.Fatalf("keyPkg.cipherSuite = %v, want %v", keyPkg.cipherSuite, welcome.cipherSuite)
 	}
