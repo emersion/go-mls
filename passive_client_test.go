@@ -75,7 +75,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		t.Errorf("invalid signature keypair: %v", err)
 	}
 
-	keyPkgRef, err := keyPkg.generateRef()
+	keyPkgRef, err := keyPkg.GenerateRef()
 	if err != nil {
 		t.Fatalf("keyPackage.generateRef() = %v", err)
 	}

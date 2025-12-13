@@ -33,7 +33,7 @@ func testWelcome(t *testing.T, tc *welcomeTest) {
 	}
 	keyPackage := keyPackageMsg.keyPackage
 
-	keyPackageRef, err := keyPackage.generateRef()
+	keyPackageRef, err := keyPackage.GenerateRef()
 	if err != nil {
 		t.Fatalf("keyPackage.generateRef() = %v", err)
 	}

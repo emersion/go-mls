@@ -226,7 +226,7 @@ func (w *Welcome) marshal(b *cryptobyte.Builder) {
 	writeOpaqueVec(b, w.encryptedGroupInfo)
 }
 
-func (w *Welcome) findSecret(ref keyPackageRef) *encryptedGroupSecrets {
+func (w *Welcome) findSecret(ref KeyPackageRef) *encryptedGroupSecrets {
 	for i, sec := range w.secrets {
 		if sec.newMember.Equal(ref) {
 			return &w.secrets[i]
@@ -235,7 +235,7 @@ func (w *Welcome) findSecret(ref keyPackageRef) *encryptedGroupSecrets {
 	return nil
 }
 
-func (w *Welcome) decryptGroupSecrets(ref keyPackageRef, initKeyPriv []byte) (*groupSecrets, error) {
+func (w *Welcome) decryptGroupSecrets(ref KeyPackageRef, initKeyPriv []byte) (*groupSecrets, error) {
 	cs := w.cipherSuite
 
 	sec := w.findSecret(ref)
@@ -291,7 +291,7 @@ func (w *Welcome) decryptGroupInfo(joinerSecret, pskSecret []byte) (*groupInfo, 
 }
 
 type encryptedGroupSecrets struct {
-	newMember             keyPackageRef
+	newMember             KeyPackageRef
 	encryptedGroupSecrets hpkeCiphertext
 }
 

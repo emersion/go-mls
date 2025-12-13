@@ -107,7 +107,8 @@ func (pkg *KeyPackage) verify(ctx *groupContext) error {
 	return nil
 }
 
-func (pkg *KeyPackage) generateRef() (keyPackageRef, error) {
+// GenerateRef generates this key package's reference.
+func (pkg *KeyPackage) GenerateRef() (KeyPackageRef, error) {
 	var b cryptobyte.Builder
 	pkg.marshal(&b)
 	raw, err := b.Bytes()
@@ -120,11 +121,13 @@ func (pkg *KeyPackage) generateRef() (keyPackageRef, error) {
 		return nil, err
 	}
 
-	return keyPackageRef(hash), nil
+	return KeyPackageRef(hash), nil
 }
 
-type keyPackageRef []byte
+// KeyPackageRef is a hash uniquely identifying a key package.
+type KeyPackageRef []byte
 
-func (ref keyPackageRef) Equal(other keyPackageRef) bool {
+// Equal checks whether two key package references are equal.
+func (ref KeyPackageRef) Equal(other KeyPackageRef) bool {
 	return bytes.Equal([]byte(ref), []byte(other))
 }
