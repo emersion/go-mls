@@ -207,12 +207,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 			}
 		}
 
-		newPSKSecret, err := extractPSKSecret(cs, pskIDs, psks)
-		if err != nil {
-			t.Fatalf("extractPSKSecret() = %v", err)
-		}
-
-		err = group.processCommit(authContent, newPSKSecret, disableLifetimeCheck)
+		err = group.processCommit(authContent, pskIDs, psks, disableLifetimeCheck)
 		if err != nil {
 			t.Errorf("processCommit() = %v", err)
 		}
