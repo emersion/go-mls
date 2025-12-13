@@ -317,6 +317,17 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		}
 		// TODO: additional proposal list checks
 
+		for _, prop := range proposals {
+			switch prop.proposalType {
+			case proposalTypeAdd, proposalTypeRemove, proposalTypeUpdate:
+				// handled by ratchetTree.apply
+			case proposalTypePSK:
+				// handled below
+			default:
+				t.Skipf("TODO: proposal type = %v", prop.proposalType)
+			}
+		}
+
 		newTree := make(ratchetTree, len(tree))
 		copy(newTree, tree)
 		newTree.apply(proposals, senders)
