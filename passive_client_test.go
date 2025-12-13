@@ -556,7 +556,6 @@ func TestPassiveClientRandom(t *testing.T) {
 
 	for i, tc := range tests {
 		t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
-			t.Skip("TODO") // "mls: invalid UpdatePathNode.encrypted_path_secret length"
 			testPassiveClient(t, &tc)
 		})
 	}
