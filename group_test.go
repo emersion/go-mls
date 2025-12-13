@@ -119,7 +119,7 @@ func verifyPublicMessage(t *testing.T, tc *messageProtectionTest, ctx *groupCont
 	if !authContent.verifySignature([]byte(tc.SignaturePub), ctx) {
 		t.Errorf("verifySignature() failed")
 	}
-	if !pubMsg.verifyMembershipTag(tc.CipherSuite, []byte(tc.MembershipKey), ctx) {
+	if !pubMsg.verifyMembershipTag([]byte(tc.MembershipKey), ctx) {
 		t.Errorf("verifyMembershipTag() failed")
 	}
 

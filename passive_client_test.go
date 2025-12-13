@@ -232,7 +232,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		membershipKey, err := cs.deriveSecret(epochSecret, secretLabelMembership)
 		if err != nil {
 			t.Errorf("deriveSecret(membership) = %v", err)
-		} else if !pubMsg.verifyMembershipTag(cs, membershipKey, &groupCtx) {
+		} else if !pubMsg.verifyMembershipTag(membershipKey, &groupCtx) {
 			t.Errorf("publicMessage.verifyMembershipTag() failed")
 		}
 

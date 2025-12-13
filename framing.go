@@ -475,7 +475,7 @@ func (msg *publicMessage) signMembershipTag(cs CipherSuite, membershipKey []byte
 	return nil
 }
 
-func (msg *publicMessage) verifyMembershipTag(cs CipherSuite, membershipKey []byte, ctx *groupContext) bool {
+func (msg *publicMessage) verifyMembershipTag(membershipKey []byte, ctx *groupContext) bool {
 	if msg.content.sender.senderType != senderTypeMember {
 		return true // there is no membership tag
 	}
@@ -483,7 +483,7 @@ func (msg *publicMessage) verifyMembershipTag(cs CipherSuite, membershipKey []by
 	if err != nil {
 		return false
 	}
-	return cs.verifyMAC(membershipKey, rawAuthContentTBM, msg.membershipTag)
+	return ctx.cipherSuite.verifyMAC(membershipKey, rawAuthContentTBM, msg.membershipTag)
 }
 
 type authenticatedContentTBM struct {
