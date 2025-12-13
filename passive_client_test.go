@@ -420,6 +420,12 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 			if err != nil {
 				t.Fatalf("ratchetTree.decryptPathSecrets() = %v", err)
 			}
+		} else {
+			// TODO: only recompute parts of the tree affected by proposals
+			newGroupCtx.treeHash, err = newTree.computeRootTreeHash(cs)
+			if err != nil {
+				t.Fatalf("ratchetTree.computeRootTreeHash() = %v", err)
+			}
 		}
 
 		newGroupCtx.confirmedTranscriptHash, err = authContent.confirmedTranscriptHashInput().hash(cs, interimTranscriptHash)
