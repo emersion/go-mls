@@ -411,6 +411,8 @@ func (node *leafNode) verify(options *leafNodeVerifyOptions) error {
 		}
 	}
 
+	// TODO: verify the leaf_node_source field
+
 	if _, dup := options.signatureKeys[string(node.signatureKey)]; dup {
 		return fmt.Errorf("mls: duplicate signature key in ratchet tree")
 	}
