@@ -30,12 +30,6 @@ type passiveClientTest struct {
 	} `json:"epochs"`
 }
 
-type pendingProposal struct {
-	ref      proposalRef
-	proposal *proposal
-	sender   leafIndex
-}
-
 func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	cs := tc.CipherSuite
 	initPriv := []byte(tc.InitPriv)
@@ -171,7 +165,6 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	for i, epoch := range tc.Epochs {
 		t.Logf("epoch %v", i)
 
-		var pendingProposals []pendingProposal
 		for _, rawProposal := range epoch.Proposals {
 			var msg mlsMessage
 			if err := unmarshal([]byte(rawProposal), &msg); err != nil {
@@ -185,21 +178,9 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 
 			authContent := pubMsg.authenticatedContent()
 
-			if authContent.content.contentType != contentTypeProposal {
-				t.Errorf("contentType = %v, want %v", authContent.content.contentType, contentTypeProposal)
+			if err := group.processProposal(authContent); err != nil {
+				t.Errorf("processProposal() = %v", err)
 			}
-			proposal := authContent.content.proposal
-
-			ref, err := authContent.generateProposalRef(cs)
-			if err != nil {
-				t.Fatalf("proposal.generateRef() = %v", err)
-			}
-
-			pendingProposals = append(pendingProposals, pendingProposal{
-				ref:      ref,
-				proposal: proposal,
-				sender:   pubMsg.content.sender.leafIndex,
-			})
 		}
 
 		var msg mlsMessage
@@ -233,7 +214,7 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 				senders = append(senders, senderLeafIndex)
 			case proposalOrRefTypeReference:
 				var found bool
-				for _, pp := range pendingProposals {
+				for _, pp := range group.pendingProposals {
 					if pp.ref.Equal(propOrRef.reference) {
 						found = true
 						proposals = append(proposals, *pp.proposal)
@@ -407,6 +388,8 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		if !bytes.Equal(confirmationTag, authContent.auth.confirmationTag) {
 			t.Errorf("invalid confirmation tag: got %v, want %v", confirmationTag, authContent.auth.confirmationTag)
 		}
+
+		group.pendingProposals = nil
 
 		tree = newTree
 		privTree = newPrivTree

@@ -8,6 +8,12 @@ import (
 	"golang.org/x/crypto/cryptobyte"
 )
 
+type pendingProposal struct {
+	ref      proposalRef
+	proposal *proposal
+	sender   leafIndex
+}
+
 // A Group is a high-level API for an MLS group.
 type Group struct {
 	tree         ratchetTree
@@ -17,6 +23,8 @@ type Group struct {
 	pskSecret             []byte
 	epochSecret           []byte
 	initSecret            []byte
+
+	pendingProposals []pendingProposal
 }
 
 // GroupFromWelcome creates a new group from a welcome message.
@@ -150,6 +158,25 @@ func (group *Group) verifyPublicMessage(pubMsg *publicMessage) (*authenticatedCo
 	}
 
 	return authContent, nil
+}
+
+func (group *Group) processProposal(authContent *authenticatedContent) error {
+	if authContent.content.contentType != contentTypeProposal {
+		panic("mls: expected a proposal")
+	}
+	proposal := authContent.content.proposal
+
+	ref, err := authContent.generateProposalRef(group.groupContext.cipherSuite)
+	if err != nil {
+		return fmt.Errorf("failed to generate proposal ref: %v", err)
+	}
+
+	group.pendingProposals = append(group.pendingProposals, pendingProposal{
+		ref:      ref,
+		proposal: proposal,
+		sender:   authContent.content.sender.leafIndex,
+	})
+	return nil
 }
 
 type commit struct {
