@@ -103,7 +103,7 @@ func (prop *proposal) marshal(b *cryptobyte.Builder) {
 }
 
 type add struct {
-	keyPackage keyPackage
+	keyPackage KeyPackage
 }
 
 func (a *add) unmarshal(s *cryptobyte.String) error {

@@ -197,7 +197,7 @@ type mlsMessage struct {
 	privateMessage *privateMessage // for wireFormatMLSPrivateMessage
 	welcome        *welcome        // for wireFormatMLSWelcome
 	groupInfo      *groupInfo      // for wireFormatMLSGroupInfo
-	keyPackage     *keyPackage     // for wireFormatMLSKeyPackage
+	keyPackage     *KeyPackage     // for wireFormatMLSKeyPackage
 }
 
 func (msg *mlsMessage) unmarshal(s *cryptobyte.String) error {
@@ -228,7 +228,7 @@ func (msg *mlsMessage) unmarshal(s *cryptobyte.String) error {
 		msg.groupInfo = new(groupInfo)
 		return msg.groupInfo.unmarshal(s)
 	case wireFormatMLSKeyPackage:
-		msg.keyPackage = new(keyPackage)
+		msg.keyPackage = new(KeyPackage)
 		return msg.keyPackage.unmarshal(s)
 	default:
 		panic("unreachable")

@@ -8,7 +8,11 @@ import (
 	"golang.org/x/crypto/cryptobyte"
 )
 
-type keyPackage struct {
+// A KeyPackage provides some public information about a user, such as
+// a supported protocol version and cipher suite, public keys, and credentials.
+//
+// Key packages should not be used more than once.
+type KeyPackage struct {
 	version     protocolVersion
 	cipherSuite CipherSuite
 	initKey     hpkePublicKey
@@ -17,8 +21,8 @@ type keyPackage struct {
 	signature   []byte
 }
 
-func (pkg *keyPackage) unmarshal(s *cryptobyte.String) error {
-	*pkg = keyPackage{}
+func (pkg *KeyPackage) unmarshal(s *cryptobyte.String) error {
+	*pkg = KeyPackage{}
 
 	ok := s.ReadUint16((*uint16)(&pkg.version)) &&
 		s.ReadUint16((*uint16)(&pkg.cipherSuite)) &&
@@ -44,7 +48,7 @@ func (pkg *keyPackage) unmarshal(s *cryptobyte.String) error {
 	return nil
 }
 
-func (pkg *keyPackage) marshalTBS(b *cryptobyte.Builder) {
+func (pkg *KeyPackage) marshalTBS(b *cryptobyte.Builder) {
 	b.AddUint16(uint16(pkg.version))
 	b.AddUint16(uint16(pkg.cipherSuite))
 	writeOpaqueVec(b, []byte(pkg.initKey))
@@ -52,12 +56,12 @@ func (pkg *keyPackage) marshalTBS(b *cryptobyte.Builder) {
 	marshalExtensionVec(b, pkg.extensions)
 }
 
-func (pkg *keyPackage) marshal(b *cryptobyte.Builder) {
+func (pkg *KeyPackage) marshal(b *cryptobyte.Builder) {
 	pkg.marshalTBS(b)
 	writeOpaqueVec(b, pkg.signature)
 }
 
-func (pkg *keyPackage) verifySignature() bool {
+func (pkg *KeyPackage) verifySignature() bool {
 	var b cryptobyte.Builder
 	pkg.marshalTBS(&b)
 	rawTBS, err := b.Bytes()
@@ -69,7 +73,7 @@ func (pkg *keyPackage) verifySignature() bool {
 }
 
 // verify performs KeyPackage verification as described in RFC 9420 section 10.1.
-func (pkg *keyPackage) verify(ctx *groupContext) error {
+func (pkg *KeyPackage) verify(ctx *groupContext) error {
 	if pkg.version != ctx.version {
 		return fmt.Errorf("mls: key package version doesn't match group context")
 	}
@@ -88,7 +92,7 @@ func (pkg *keyPackage) verify(ctx *groupContext) error {
 	return nil
 }
 
-func (pkg *keyPackage) generateRef() (keyPackageRef, error) {
+func (pkg *KeyPackage) generateRef() (keyPackageRef, error) {
 	var b cryptobyte.Builder
 	pkg.marshal(&b)
 	raw, err := b.Bytes()
