@@ -210,31 +210,12 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		}
 		pubMsg := msg.publicMessage
 
-		if pubMsg.content.epoch != groupCtx.epoch {
-			t.Errorf("epoch = %v, want %v", pubMsg.content.epoch, groupCtx.epoch)
-		}
-
-		if pubMsg.content.sender.senderType != senderTypeMember {
-			t.Fatalf("TODO: senderType = %v", pubMsg.content.sender.senderType)
+		authContent, err := group.verifyPublicMessage(pubMsg)
+		if err != nil {
+			t.Errorf("verifyPublicMessage() = %v", err)
 		}
 		senderLeafIndex := pubMsg.content.sender.leafIndex
-		// TODO: check tree length
 		senderNode := tree.getLeaf(senderLeafIndex)
-		if senderNode == nil {
-			t.Fatalf("blank leaf node for sender")
-		}
-
-		authContent := pubMsg.authenticatedContent()
-		if !authContent.verifySignature([]byte(senderNode.signatureKey), &groupCtx) {
-			t.Errorf("verifySignature() failed")
-		}
-
-		membershipKey, err := cs.deriveSecret(epochSecret, secretLabelMembership)
-		if err != nil {
-			t.Errorf("deriveSecret(membership) = %v", err)
-		} else if !pubMsg.verifyMembershipTag(membershipKey, &groupCtx) {
-			t.Errorf("publicMessage.verifyMembershipTag() failed")
-		}
 
 		if authContent.content.contentType != contentTypeCommit {
 			t.Errorf("contentType = %v, want %v", authContent.content.contentType, contentTypeCommit)
@@ -434,6 +415,10 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		pskSecret = newPSKSecret
 		epochSecret = newEpochSecret
 		initSecret = newInitSecret
+
+		group.tree = tree
+		group.groupContext = groupCtx
+		group.epochSecret = epochSecret
 	}
 
 	_ = pskSecret

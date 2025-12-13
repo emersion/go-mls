@@ -118,6 +118,40 @@ func groupFromSecrets(welcome *Welcome, groupSecrets *groupSecrets, options *gro
 	}, groupInfo, nil
 }
 
+func (group *Group) verifyPublicMessage(pubMsg *publicMessage) (*authenticatedContent, error) {
+	if !pubMsg.content.groupID.Equal(group.groupContext.groupID) {
+		return nil, fmt.Errorf("mls: message group ID mismatch")
+	}
+	if pubMsg.content.epoch != group.groupContext.epoch {
+		return nil, fmt.Errorf("mls: epoch mismatch: got %v, want %v", pubMsg.content.epoch, group.groupContext.epoch)
+	}
+
+	if pubMsg.content.sender.senderType != senderTypeMember {
+		// TODO: support other sender types
+		return nil, fmt.Errorf("mls: unsupported sender type: %v", pubMsg.content.sender.senderType)
+	}
+	senderLeafIndex := pubMsg.content.sender.leafIndex
+	// TODO: check tree length
+	senderNode := group.tree.getLeaf(senderLeafIndex)
+	if senderNode == nil {
+		return nil, fmt.Errorf("mls: blank leaf node for sender")
+	}
+
+	authContent := pubMsg.authenticatedContent()
+	if !authContent.verifySignature([]byte(senderNode.signatureKey), &group.groupContext) {
+		return nil, fmt.Errorf("mls: failed to verify public message signature")
+	}
+
+	membershipKey, err := group.groupContext.cipherSuite.deriveSecret(group.epochSecret, secretLabelMembership)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive membership key: %v", err)
+	} else if !pubMsg.verifyMembershipTag(membershipKey, &group.groupContext) {
+		return nil, fmt.Errorf("failed to verify membership tag")
+	}
+
+	return authContent, nil
+}
+
 type commit struct {
 	proposals []proposalOrRef
 	path      *updatePath // optional
