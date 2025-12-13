@@ -3,9 +3,120 @@ package mls
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"golang.org/x/crypto/cryptobyte"
 )
+
+// A Group is a high-level API for an MLS group.
+type Group struct {
+	tree         ratchetTree
+	groupContext groupContext
+
+	interimTranscriptHash []byte
+	pskSecret             []byte
+	epochSecret           []byte
+	initSecret            []byte
+}
+
+// GroupFromWelcome creates a new group from a welcome message.
+func GroupFromWelcome(welcome *Welcome, keyPkgRef KeyPackageRef, initKeyPriv []byte) (*Group, error) {
+	groupSecrets, err := welcome.decryptGroupSecrets(keyPkgRef, initKeyPriv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt group secrets: %v", err)
+	}
+
+	if !groupSecrets.verifySingleReinitOrBranchPSK() {
+		return nil, fmt.Errorf("mls: more than one key has usage reinit or branch in group secrets")
+	}
+
+	if len(groupSecrets.psks) != 0 {
+		return nil, fmt.Errorf("mls: group secret PSKs are not yet supported")
+	}
+
+	group, _, err := groupFromSecrets(welcome, groupSecrets, nil)
+	return group, err
+}
+
+type groupFromSecretsOptions struct {
+	rawTree []byte
+	psks    [][]byte
+	now     func() time.Time
+}
+
+func groupFromSecrets(welcome *Welcome, groupSecrets *groupSecrets, options *groupFromSecretsOptions) (*Group, *groupInfo, error) {
+	if options == nil {
+		options = new(groupFromSecretsOptions)
+	}
+
+	pskSecret, err := extractPSKSecret(welcome.cipherSuite, groupSecrets.psks, options.psks)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to extract PSK secret: %v", err)
+	}
+
+	groupInfo, err := welcome.decryptGroupInfo(groupSecrets.joinerSecret, pskSecret)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to decrypt group info: %v", err)
+	}
+
+	rawTree := options.rawTree
+	if rawTree == nil {
+		rawTree = findExtensionData(groupInfo.extensions, extensionTypeRatchetTree)
+	}
+	if rawTree == nil {
+		return nil, nil, fmt.Errorf("mls: missing ratchet tree")
+	}
+
+	var tree ratchetTree
+	if err := unmarshal(rawTree, &tree); err != nil {
+		return nil, nil, fmt.Errorf("failed to unmarshal ratchet tree: %v", err)
+	}
+
+	signerNode := tree.getLeaf(groupInfo.signer)
+	if signerNode == nil {
+		return nil, nil, fmt.Errorf("mls: signer node is blank")
+	} else if !groupInfo.verifySignature(signerNode.signatureKey) {
+		return nil, nil, fmt.Errorf("mls: failed to verify signer node signature")
+	}
+	if !groupInfo.verifyConfirmationTag(groupSecrets.joinerSecret, pskSecret) {
+		return nil, nil, fmt.Errorf("mls: failed to verify confirmation tag")
+	}
+	if groupInfo.groupContext.cipherSuite != welcome.cipherSuite {
+		return nil, nil, fmt.Errorf("mls: group info cipher suite doesn't match key package")
+	}
+
+	if err := tree.verifyIntegrity(&groupInfo.groupContext, options.now); err != nil {
+		return nil, nil, fmt.Errorf("failed to verify ratchet tree integrity: %v", err)
+	}
+
+	// TODO: perform other group info verification steps
+
+	groupCtx := groupInfo.groupContext
+
+	epochSecret, err := groupCtx.extractEpochSecret(groupSecrets.joinerSecret, pskSecret)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to extract epoch secret: %v", err)
+	}
+
+	initSecret, err := groupCtx.cipherSuite.deriveSecret(epochSecret, secretLabelInit)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to derive init secret: %v", err)
+	}
+
+	interimTranscriptHash, err := nextInterimTranscriptHash(groupCtx.cipherSuite, groupCtx.confirmedTranscriptHash, groupInfo.confirmationTag)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to compute next interim transcript hash: %v", err)
+	}
+
+	return &Group{
+		tree:                  tree,
+		groupContext:          groupCtx,
+		interimTranscriptHash: interimTranscriptHash,
+		pskSecret:             pskSecret,
+		epochSecret:           epochSecret,
+		initSecret:            initSecret,
+	}, groupInfo, nil
+}
 
 type commit struct {
 	proposals []proposalOrRef

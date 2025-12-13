@@ -108,46 +108,29 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		}
 	}
 
-	pskSecret, err := extractPSKSecret(cs, groupSecrets.psks, psks)
-	if err != nil {
-		t.Fatalf("extractPSKSecret() = %v", err)
-	}
-
-	groupInfo, err := welcome.decryptGroupInfo(groupSecrets.joinerSecret, pskSecret)
-	if err != nil {
-		t.Fatalf("welcome.decryptGroupInfo() = %v", err)
-	}
-
-	rawTree := []byte(tc.RatchetTree)
-	if rawTree == nil {
-		rawTree = findExtensionData(groupInfo.extensions, extensionTypeRatchetTree)
-	}
-	if rawTree == nil {
-		t.Fatalf("missing ratchet tree")
-	}
-
-	var tree ratchetTree
-	if err := unmarshal(rawTree, &tree); err != nil {
-		t.Fatalf("unmarshal(ratchetTree) = %v", err)
-	}
-
-	signerNode := tree.getLeaf(groupInfo.signer)
-	if signerNode == nil {
-		t.Errorf("signer node is blank")
-	} else if !groupInfo.verifySignature(signerNode.signatureKey) {
-		t.Errorf("groupInfo.verifySignature() failed")
-	}
-	if !groupInfo.verifyConfirmationTag(groupSecrets.joinerSecret, pskSecret) {
-		t.Errorf("groupInfo.verifyConfirmationTag() failed")
-	}
-	if groupInfo.groupContext.cipherSuite != keyPkg.cipherSuite {
-		t.Errorf("groupInfo.cipherSuite = %v, want %v", groupInfo.groupContext.cipherSuite, keyPkg.cipherSuite)
-	}
-
 	disableLifetimeCheck := func() time.Time { return time.Time{} }
-	if err := tree.verifyIntegrity(&groupInfo.groupContext, disableLifetimeCheck); err != nil {
-		t.Errorf("tree.verifyIntegrity() = %v", err)
+	group, groupInfo, err := groupFromSecrets(welcome, groupSecrets, &groupFromSecretsOptions{
+		rawTree: []byte(tc.RatchetTree),
+		psks:    psks,
+		now:     disableLifetimeCheck,
+	})
+	if err != nil {
+		t.Errorf("groupFromWelcomeAndSecrets() = %v", err)
 	}
+
+	epochAuthenticator, err := cs.deriveSecret(group.epochSecret, secretLabelAuthentication)
+	if err != nil {
+		t.Errorf("deriveSecret(authentication) = %v", err)
+	} else if !bytes.Equal(epochAuthenticator, []byte(tc.InitialEpochAuthenticator)) {
+		t.Errorf("deriveSecret(authentication) = %v, want %v", epochAuthenticator, tc.InitialEpochAuthenticator)
+	}
+
+	groupCtx := group.groupContext
+	tree := group.tree
+	epochSecret := group.epochSecret
+	interimTranscriptHash := group.interimTranscriptHash
+	initSecret := group.initSecret
+	pskSecret := group.pskSecret
 
 	myLeafIndex, ok := tree.findLeaf(&keyPkg.leafNode)
 	if !ok {
@@ -183,31 +166,6 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 			}
 			privTree[int(nodeIndex)] = nodePriv
 		}
-	}
-
-	// TODO: perform other group info verification steps
-
-	groupCtx := groupInfo.groupContext
-
-	epochSecret, err := groupCtx.extractEpochSecret(groupSecrets.joinerSecret, pskSecret)
-	if err != nil {
-		t.Fatalf("groupContext.extractEpochSecret() = %v", err)
-	}
-	epochAuthenticator, err := cs.deriveSecret(epochSecret, secretLabelAuthentication)
-	if err != nil {
-		t.Errorf("deriveSecret(authentication) = %v", err)
-	} else if !bytes.Equal(epochAuthenticator, []byte(tc.InitialEpochAuthenticator)) {
-		t.Errorf("deriveSecret(authentication) = %v, want %v", epochAuthenticator, tc.InitialEpochAuthenticator)
-	}
-
-	initSecret, err := cs.deriveSecret(epochSecret, secretLabelInit)
-	if err != nil {
-		t.Errorf("deriveSecret(init) = %v", err)
-	}
-
-	interimTranscriptHash, err := nextInterimTranscriptHash(cs, groupCtx.confirmedTranscriptHash, groupInfo.confirmationTag)
-	if err != nil {
-		t.Errorf("nextInterimTranscriptHash() = %v", err)
 	}
 
 	for i, epoch := range tc.Epochs {
@@ -477,6 +435,8 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 		epochSecret = newEpochSecret
 		initSecret = newInitSecret
 	}
+
+	_ = pskSecret
 }
 
 func checkEncryptionKeyPair(cs CipherSuite, pub, priv []byte) error {
