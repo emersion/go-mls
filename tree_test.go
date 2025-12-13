@@ -9,7 +9,7 @@ import (
 )
 
 type treeValidationTest struct {
-	CipherSuite cipherSuite `json:"cipher_suite"`
+	CipherSuite CipherSuite `json:"cipher_suite"`
 
 	Tree    testBytes `json:"tree"`
 	GroupID testBytes `json:"group_id"`
@@ -76,7 +76,7 @@ func TestTreeValidation(t *testing.T) {
 }
 
 type treeKEMTest struct {
-	CipherSuite cipherSuite `json:"cipher_suite"`
+	CipherSuite CipherSuite `json:"cipher_suite"`
 
 	GroupID                 testBytes `json:"group_id"`
 	Epoch                   uint64    `json:"epoch"`
@@ -203,7 +203,7 @@ func TestTreeKEM(t *testing.T) {
 }
 
 type treeOperationsTest struct {
-	CipherSuite cipherSuite `json:"cipher_suite"`
+	CipherSuite CipherSuite `json:"cipher_suite"`
 
 	TreeBefore     testBytes `json:"tree_before"`
 	Proposal       testBytes `json:"proposal"`

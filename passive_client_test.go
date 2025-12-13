@@ -8,7 +8,7 @@ import (
 )
 
 type passiveClientTest struct {
-	CipherSuite cipherSuite `json:"cipher_suite"`
+	CipherSuite CipherSuite `json:"cipher_suite"`
 
 	ExternalPSKs []struct {
 		PSKID testBytes `json:"psk_id"`
@@ -491,7 +491,7 @@ func unmarshalMLSMessage(raw testBytes, wf wireFormat) (*mlsMessage, error) {
 	return &msg, nil
 }
 
-func checkEncryptionKeyPair(cs cipherSuite, pub, priv []byte) error {
+func checkEncryptionKeyPair(cs CipherSuite, pub, priv []byte) error {
 	wantPlaintext := []byte("foo")
 	label := []byte("bar")
 
@@ -512,7 +512,7 @@ func checkEncryptionKeyPair(cs cipherSuite, pub, priv []byte) error {
 	return nil
 }
 
-func checkSignatureKeyPair(cs cipherSuite, pub, priv []byte) error {
+func checkSignatureKeyPair(cs CipherSuite, pub, priv []byte) error {
 	content := []byte("foo")
 	label := []byte("bar")
 

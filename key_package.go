@@ -10,7 +10,7 @@ import (
 
 type keyPackage struct {
 	version     protocolVersion
-	cipherSuite cipherSuite
+	cipherSuite CipherSuite
 	initKey     hpkePublicKey
 	leafNode    leafNode
 	extensions  []extension

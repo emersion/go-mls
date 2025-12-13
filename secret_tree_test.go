@@ -7,7 +7,7 @@ import (
 )
 
 type secretTreeTest struct {
-	CipherSuite cipherSuite `json:"cipher_suite"`
+	CipherSuite CipherSuite `json:"cipher_suite"`
 
 	SenderData struct {
 		SenderDataSecret testBytes `json:"sender_data_secret"`
@@ -62,7 +62,7 @@ func testSecretTree(t *testing.T, tc *secretTreeTest) {
 	}
 }
 
-func testRatchetSecret(t *testing.T, cs cipherSuite, tree secretTree, li leafIndex, label ratchetLabel, gens []secretTreeTestGen) {
+func testRatchetSecret(t *testing.T, cs CipherSuite, tree secretTree, li leafIndex, label ratchetLabel, gens []secretTreeTestGen) {
 	secret, err := tree.deriveRatchetRoot(cs, li.nodeIndex(), label)
 	if err != nil {
 		t.Fatalf("deriveRatchetRoot() = %v", err)

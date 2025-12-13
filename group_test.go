@@ -7,7 +7,7 @@ import (
 )
 
 type welcomeTest struct {
-	CipherSuite cipherSuite `json:"cipher_suite"`
+	CipherSuite CipherSuite `json:"cipher_suite"`
 
 	InitPriv  testBytes `json:"init_priv"`
 	SignerPub testBytes `json:"signer_pub"`
@@ -67,7 +67,7 @@ func TestWelcome(t *testing.T) {
 }
 
 type messageProtectionTest struct {
-	CipherSuite cipherSuite `json:"cipher_suite"`
+	CipherSuite CipherSuite `json:"cipher_suite"`
 
 	GroupID                 testBytes `json:"group_id"`
 	Epoch                   uint64    `json:"epoch"`

@@ -9,7 +9,7 @@ import (
 
 type groupContext struct {
 	version                 protocolVersion
-	cipherSuite             cipherSuite
+	cipherSuite             CipherSuite
 	groupID                 GroupID
 	epoch                   uint64
 	treeHash                []byte
@@ -83,7 +83,7 @@ func (ctx *groupContext) extractEpochSecret(joinerSecret, pskSecret []byte) ([]b
 	return cs.expandWithLabel(extracted, []byte("epoch"), rawGroupContext, uint16(kdf.ExtractSize()))
 }
 
-func extractWelcomeSecret(cs cipherSuite, joinerSecret, pskSecret []byte) ([]byte, error) {
+func extractWelcomeSecret(cs CipherSuite, joinerSecret, pskSecret []byte) ([]byte, error) {
 	_, kdf, _ := cs.hpke().Params()
 
 	if pskSecret == nil {
@@ -94,7 +94,7 @@ func extractWelcomeSecret(cs cipherSuite, joinerSecret, pskSecret []byte) ([]byt
 	return cs.deriveSecret(extracted, []byte("welcome"))
 }
 
-func deriveExporter(cs cipherSuite, exporterSecret, label, context []byte, length uint16) ([]byte, error) {
+func deriveExporter(cs CipherSuite, exporterSecret, label, context []byte, length uint16) ([]byte, error) {
 	derived, err := cs.deriveSecret(exporterSecret, label)
 	if err != nil {
 		return nil, err
@@ -134,7 +134,7 @@ func (input *confirmedTranscriptHashInput) marshal(b *cryptobyte.Builder) {
 	writeOpaqueVec(b, input.signature)
 }
 
-func (input *confirmedTranscriptHashInput) hash(cs cipherSuite, interimTranscriptHashBefore []byte) ([]byte, error) {
+func (input *confirmedTranscriptHashInput) hash(cs CipherSuite, interimTranscriptHashBefore []byte) ([]byte, error) {
 	rawInput, err := marshal(input)
 	if err != nil {
 		return nil, err
@@ -146,7 +146,7 @@ func (input *confirmedTranscriptHashInput) hash(cs cipherSuite, interimTranscrip
 	return h.Sum(nil), nil
 }
 
-func nextInterimTranscriptHash(cs cipherSuite, confirmedTranscriptHash, confirmationTag []byte) ([]byte, error) {
+func nextInterimTranscriptHash(cs CipherSuite, confirmedTranscriptHash, confirmationTag []byte) ([]byte, error) {
 	var b cryptobyte.Builder
 	writeOpaqueVec(&b, confirmationTag)
 	rawInput, err := b.Bytes()
@@ -266,7 +266,7 @@ func (id *preSharedKeyID) marshal(b *cryptobyte.Builder) {
 	writeOpaqueVec(b, id.pskNonce)
 }
 
-func extractPSKSecret(cs cipherSuite, pskIDs []preSharedKeyID, psks [][]byte) ([]byte, error) {
+func extractPSKSecret(cs CipherSuite, pskIDs []preSharedKeyID, psks [][]byte) ([]byte, error) {
 	if len(pskIDs) != len(psks) {
 		return nil, fmt.Errorf("mls: got %v PSK IDs and %v PSKs, want same number", len(pskIDs), len(psks))
 	}

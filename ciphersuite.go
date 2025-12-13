@@ -17,39 +17,45 @@ import (
 	"golang.org/x/crypto/cryptobyte"
 )
 
-type cipherSuite uint16
+// A CipherSuite defines the cryptographic primitives to be used in group key
+// computations: HPKE parameters (KEM, KDF and AEAD), hash, MAC and signature.
+//
+// MLS cipher suites are listed at:
+// https://www.iana.org/assignments/mls/mls.xhtml#mls-ciphersuites
+type CipherSuite uint16
 
 const (
-	cipherSuiteMLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519        cipherSuite = 0x0001
-	cipherSuiteMLS_128_DHKEMP256_AES128GCM_SHA256_P256             cipherSuite = 0x0002
-	cipherSuiteMLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 cipherSuite = 0x0003
-	cipherSuiteMLS_256_DHKEMX448_AES256GCM_SHA512_Ed448            cipherSuite = 0x0004
-	cipherSuiteMLS_256_DHKEMP521_AES256GCM_SHA512_P521             cipherSuite = 0x0005
-	cipherSuiteMLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448     cipherSuite = 0x0006
-	cipherSuiteMLS_256_DHKEMP384_AES256GCM_SHA384_P384             cipherSuite = 0x0007
+	CipherSuiteMLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519        CipherSuite = 0x0001
+	CipherSuiteMLS_128_DHKEMP256_AES128GCM_SHA256_P256             CipherSuite = 0x0002
+	CipherSuiteMLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 CipherSuite = 0x0003
+	CipherSuiteMLS_256_DHKEMX448_AES256GCM_SHA512_Ed448            CipherSuite = 0x0004
+	CipherSuiteMLS_256_DHKEMP521_AES256GCM_SHA512_P521             CipherSuite = 0x0005
+	CipherSuiteMLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448     CipherSuite = 0x0006
+	CipherSuiteMLS_256_DHKEMP384_AES256GCM_SHA384_P384             CipherSuite = 0x0007
 )
 
-func (cs cipherSuite) String() string {
+// String returns the name of the cipher suite.
+func (cs CipherSuite) String() string {
 	switch cs {
-	case cipherSuiteMLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519:
+	case CipherSuiteMLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519:
 		return "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"
-	case cipherSuiteMLS_128_DHKEMP256_AES128GCM_SHA256_P256:
+	case CipherSuiteMLS_128_DHKEMP256_AES128GCM_SHA256_P256:
 		return "MLS_128_DHKEMP256_AES128GCM_SHA256_P256"
-	case cipherSuiteMLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519:
+	case CipherSuiteMLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519:
 		return "MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519"
-	case cipherSuiteMLS_256_DHKEMX448_AES256GCM_SHA512_Ed448:
+	case CipherSuiteMLS_256_DHKEMX448_AES256GCM_SHA512_Ed448:
 		return "MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448"
-	case cipherSuiteMLS_256_DHKEMP521_AES256GCM_SHA512_P521:
+	case CipherSuiteMLS_256_DHKEMP521_AES256GCM_SHA512_P521:
 		return "MLS_256_DHKEMP521_AES256GCM_SHA512_P521"
-	case cipherSuiteMLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448:
+	case CipherSuiteMLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448:
 		return "MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448"
-	case cipherSuiteMLS_256_DHKEMP384_AES256GCM_SHA384_P384:
+	case CipherSuiteMLS_256_DHKEMP384_AES256GCM_SHA384_P384:
 		return "MLS_256_DHKEMP384_AES256GCM_SHA384_P384"
 	}
 	return fmt.Sprintf("<%d>", cs)
 }
 
-func (cs cipherSuite) hash() crypto.Hash {
+func (cs CipherSuite) hash() crypto.Hash {
 	desc, ok := cipherSuiteDescriptions[cs]
 	if !ok {
 		panic(fmt.Errorf("mls: invalid cipher suite %d", cs))
@@ -57,7 +63,7 @@ func (cs cipherSuite) hash() crypto.Hash {
 	return desc.hash
 }
 
-func (cs cipherSuite) hpke() hpke.Suite {
+func (cs CipherSuite) hpke() hpke.Suite {
 	desc, ok := cipherSuiteDescriptions[cs]
 	if !ok {
 		panic(fmt.Errorf("mls: invalid cipher suite %d", cs))
@@ -65,7 +71,7 @@ func (cs cipherSuite) hpke() hpke.Suite {
 	return desc.hpke
 }
 
-func (cs cipherSuite) signatureScheme() signatureScheme {
+func (cs CipherSuite) signatureScheme() signatureScheme {
 	desc, ok := cipherSuiteDescriptions[cs]
 	if !ok {
 		panic(fmt.Errorf("mls: invalid cipher suite %d", cs))
@@ -79,56 +85,56 @@ type cipherSuiteDescription struct {
 	sig  signatureScheme
 }
 
-var cipherSuiteDescriptions = map[cipherSuite]cipherSuiteDescription{
-	cipherSuiteMLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519: {
+var cipherSuiteDescriptions = map[CipherSuite]cipherSuiteDescription{
+	CipherSuiteMLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519: {
 		hash: crypto.SHA256,
 		hpke: hpke.NewSuite(hpke.KEM_X25519_HKDF_SHA256, hpke.KDF_HKDF_SHA256, hpke.AEAD_AES128GCM),
 		sig:  ed25519SignatureScheme{},
 	},
-	cipherSuiteMLS_128_DHKEMP256_AES128GCM_SHA256_P256: {
+	CipherSuiteMLS_128_DHKEMP256_AES128GCM_SHA256_P256: {
 		hash: crypto.SHA256,
 		hpke: hpke.NewSuite(hpke.KEM_P256_HKDF_SHA256, hpke.KDF_HKDF_SHA256, hpke.AEAD_AES128GCM),
 		sig:  ecdsaSignatureScheme{elliptic.P256(), crypto.SHA256},
 	},
-	cipherSuiteMLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519: {
+	CipherSuiteMLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519: {
 		hash: crypto.SHA256,
 		hpke: hpke.NewSuite(hpke.KEM_X25519_HKDF_SHA256, hpke.KDF_HKDF_SHA256, hpke.AEAD_ChaCha20Poly1305),
 		sig:  ed25519SignatureScheme{},
 	},
-	cipherSuiteMLS_256_DHKEMX448_AES256GCM_SHA512_Ed448: {
+	CipherSuiteMLS_256_DHKEMX448_AES256GCM_SHA512_Ed448: {
 		hash: crypto.SHA512,
 		hpke: hpke.NewSuite(hpke.KEM_X448_HKDF_SHA512, hpke.KDF_HKDF_SHA512, hpke.AEAD_AES256GCM),
 		sig:  ed448SignatureScheme{},
 	},
-	cipherSuiteMLS_256_DHKEMP521_AES256GCM_SHA512_P521: {
+	CipherSuiteMLS_256_DHKEMP521_AES256GCM_SHA512_P521: {
 		hash: crypto.SHA512,
 		hpke: hpke.NewSuite(hpke.KEM_P521_HKDF_SHA512, hpke.KDF_HKDF_SHA512, hpke.AEAD_AES256GCM),
 		sig:  ecdsaSignatureScheme{elliptic.P521(), crypto.SHA512},
 	},
-	cipherSuiteMLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448: {
+	CipherSuiteMLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448: {
 		hash: crypto.SHA512,
 		hpke: hpke.NewSuite(hpke.KEM_X448_HKDF_SHA512, hpke.KDF_HKDF_SHA512, hpke.AEAD_ChaCha20Poly1305),
 		sig:  ed448SignatureScheme{},
 	},
-	cipherSuiteMLS_256_DHKEMP384_AES256GCM_SHA384_P384: {
+	CipherSuiteMLS_256_DHKEMP384_AES256GCM_SHA384_P384: {
 		hash: crypto.SHA384,
 		hpke: hpke.NewSuite(hpke.KEM_P384_HKDF_SHA384, hpke.KDF_HKDF_SHA384, hpke.AEAD_AES256GCM),
 		sig:  ecdsaSignatureScheme{elliptic.P384(), crypto.SHA384},
 	},
 }
 
-func (cs cipherSuite) signMAC(key, message []byte) []byte {
+func (cs CipherSuite) signMAC(key, message []byte) []byte {
 	// All cipher suites use HMAC
 	mac := hmac.New(cs.hash().New, key)
 	mac.Write(message)
 	return mac.Sum(nil)
 }
 
-func (cs cipherSuite) verifyMAC(key, message, tag []byte) bool {
+func (cs CipherSuite) verifyMAC(key, message, tag []byte) bool {
 	return hmac.Equal(tag, cs.signMAC(key, message))
 }
 
-func (cs cipherSuite) refHash(label, value []byte) ([]byte, error) {
+func (cs CipherSuite) refHash(label, value []byte) ([]byte, error) {
 	var b cryptobyte.Builder
 	writeOpaqueVec(&b, label)
 	writeOpaqueVec(&b, value)
@@ -142,7 +148,7 @@ func (cs cipherSuite) refHash(label, value []byte) ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
-func (cs cipherSuite) expandWithLabel(secret, label, context []byte, length uint16) ([]byte, error) {
+func (cs CipherSuite) expandWithLabel(secret, label, context []byte, length uint16) ([]byte, error) {
 	label = append([]byte("MLS 1.0 "), label...)
 
 	var b cryptobyte.Builder
@@ -158,12 +164,12 @@ func (cs cipherSuite) expandWithLabel(secret, label, context []byte, length uint
 	return kdf.Expand(secret, kdfLabel, uint(length)), nil
 }
 
-func (cs cipherSuite) deriveSecret(secret, label []byte) ([]byte, error) {
+func (cs CipherSuite) deriveSecret(secret, label []byte) ([]byte, error) {
 	_, kdf, _ := cs.hpke().Params()
 	return cs.expandWithLabel(secret, label, nil, uint16(kdf.ExtractSize()))
 }
 
-func (cs cipherSuite) signWithLabel(signKey, label, content []byte) ([]byte, error) {
+func (cs CipherSuite) signWithLabel(signKey, label, content []byte) ([]byte, error) {
 	signContent, err := marshalSignContent(label, content)
 	if err != nil {
 		return nil, err
@@ -172,7 +178,7 @@ func (cs cipherSuite) signWithLabel(signKey, label, content []byte) ([]byte, err
 	return cs.signatureScheme().Sign(signKey, signContent)
 }
 
-func (cs cipherSuite) verifyWithLabel(verifKey, label, content, signValue []byte) bool {
+func (cs CipherSuite) verifyWithLabel(verifKey, label, content, signValue []byte) bool {
 	signContent, err := marshalSignContent(label, content)
 	if err != nil {
 		return false
@@ -181,7 +187,7 @@ func (cs cipherSuite) verifyWithLabel(verifKey, label, content, signValue []byte
 	return cs.signatureScheme().Verify(verifKey, signContent, signValue)
 }
 
-func (cs cipherSuite) encryptWithLabel(publicKey, label, context, plaintext []byte) (kemOutput, ciphertext []byte, err error) {
+func (cs CipherSuite) encryptWithLabel(publicKey, label, context, plaintext []byte) (kemOutput, ciphertext []byte, err error) {
 	encryptContext, err := marshalEncryptContext(label, context)
 	if err != nil {
 		return nil, nil, err
@@ -208,7 +214,7 @@ func (cs cipherSuite) encryptWithLabel(publicKey, label, context, plaintext []by
 	return kemOutput, ciphertext, err
 }
 
-func (cs cipherSuite) decryptWithLabel(privateKey, label, context, kemOutput, ciphertext []byte) ([]byte, error) {
+func (cs CipherSuite) decryptWithLabel(privateKey, label, context, kemOutput, ciphertext []byte) ([]byte, error) {
 	encryptContext, err := marshalEncryptContext(label, context)
 	if err != nil {
 		return nil, err

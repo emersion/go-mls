@@ -7,7 +7,7 @@ import (
 )
 
 type cryptoBasicsTest struct {
-	CipherSuite      cipherSuite          `json:"cipher_suite"`
+	CipherSuite      CipherSuite          `json:"cipher_suite"`
 	RefHash          refHashTest          `json:"ref_hash"`
 	ExpandWithLabel  expandWithLabelTest  `json:"expand_with_label"`
 	DeriveSecret     deriveSecretTest     `json:"derive_secret"`
@@ -22,7 +22,7 @@ type refHashTest struct {
 	Value testBytes `json:"value"`
 }
 
-func testRefHash(t *testing.T, cs cipherSuite, tc *refHashTest) {
+func testRefHash(t *testing.T, cs CipherSuite, tc *refHashTest) {
 	out, err := cs.refHash([]byte(tc.Label), []byte(tc.Value))
 	if err != nil {
 		t.Fatal(err)
@@ -40,7 +40,7 @@ type expandWithLabelTest struct {
 	Out     testBytes `json:"out"`
 }
 
-func testExpandWithLabel(t *testing.T, cs cipherSuite, tc *expandWithLabelTest) {
+func testExpandWithLabel(t *testing.T, cs CipherSuite, tc *expandWithLabelTest) {
 	out, err := cs.expandWithLabel([]byte(tc.Secret), []byte(tc.Label), []byte(tc.Context), tc.Length)
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +56,7 @@ type deriveSecretTest struct {
 	Secret testBytes `json:"secret"`
 }
 
-func testDeriveSecret(t *testing.T, cs cipherSuite, tc *deriveSecretTest) {
+func testDeriveSecret(t *testing.T, cs CipherSuite, tc *deriveSecretTest) {
 	out, err := cs.deriveSecret([]byte(tc.Secret), []byte(tc.Label))
 	if err != nil {
 		t.Fatal(err)
@@ -74,7 +74,7 @@ type deriveTreeSecretTest struct {
 	Out        testBytes `json:"out"`
 }
 
-func testDeriveTreeSecret(t *testing.T, cs cipherSuite, tc *deriveTreeSecretTest) {
+func testDeriveTreeSecret(t *testing.T, cs CipherSuite, tc *deriveTreeSecretTest) {
 	out, err := deriveTreeSecret(cs, []byte(tc.Secret), []byte(tc.Label), tc.Generation, tc.Length)
 	if err != nil {
 		t.Fatal(err)
@@ -92,7 +92,7 @@ type signWithLabelTest struct {
 	Signature testBytes `json:"signature"`
 }
 
-func testSignWithLabel(t *testing.T, cs cipherSuite, tc *signWithLabelTest) {
+func testSignWithLabel(t *testing.T, cs CipherSuite, tc *signWithLabelTest) {
 	if !cs.verifyWithLabel([]byte(tc.Pub), []byte(tc.Label), []byte(tc.Content), []byte(tc.Signature)) {
 		t.Error("reference signature did not verify")
 	}
@@ -116,7 +116,7 @@ type encryptWithLabelTest struct {
 	Ciphertext testBytes `json:"ciphertext"`
 }
 
-func testEncryptWithLabel(t *testing.T, cs cipherSuite, tc *encryptWithLabelTest) {
+func testEncryptWithLabel(t *testing.T, cs CipherSuite, tc *encryptWithLabelTest) {
 	plaintext, err := cs.decryptWithLabel([]byte(tc.Priv), []byte(tc.Label), []byte(tc.Context), []byte(tc.KEMOutput), []byte(tc.Ciphertext))
 	if err != nil {
 		t.Fatalf("decryptWithLabel() = %v", err)

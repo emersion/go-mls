@@ -160,7 +160,7 @@ func (psk *preSharedKey) marshal(b *cryptobyte.Builder) {
 type reInit struct {
 	groupID     GroupID
 	version     protocolVersion
-	cipherSuite cipherSuite
+	cipherSuite CipherSuite
 	extensions  []extension
 }
 
@@ -546,7 +546,7 @@ func (sec *groupSecrets) verifySingleReinitOrBranchPSK() bool {
 }
 
 type welcome struct {
-	cipherSuite        cipherSuite
+	cipherSuite        CipherSuite
 	secrets            []encryptedGroupSecrets
 	encryptedGroupInfo []byte
 }

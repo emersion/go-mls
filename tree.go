@@ -38,7 +38,7 @@ func (node *parentNode) marshal(b *cryptobyte.Builder) {
 	})
 }
 
-func (node *parentNode) computeParentHash(cs cipherSuite, originalSiblingTreeHash []byte) ([]byte, error) {
+func (node *parentNode) computeParentHash(cs CipherSuite, originalSiblingTreeHash []byte) ([]byte, error) {
 	rawInput, err := marshalParentHashInput(node.encryptionKey, node.parentHash, originalSiblingTreeHash)
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func (src leafNodeSource) marshal(b *cryptobyte.Builder) {
 
 type capabilities struct {
 	versions     []protocolVersion
-	cipherSuites []cipherSuite
+	cipherSuites []CipherSuite
 	extensions   []extensionType
 	proposals    []proposalType
 	credentials  []credentialType
@@ -106,7 +106,7 @@ func (caps *capabilities) unmarshal(s *cryptobyte.String) error {
 	}
 
 	err = readVector(s, func(s *cryptobyte.String) error {
-		var cs cipherSuite
+		var cs CipherSuite
 		if !s.ReadUint16((*uint16)(&cs)) {
 			return io.ErrUnexpectedEOF
 		}
@@ -362,7 +362,7 @@ func (node *leafNodeTBS) marshal(b *cryptobyte.Builder) {
 //
 // groupID and li can be left unspecified if the leaf node source is neither
 // update nor commit.
-func (node *leafNode) verifySignature(cs cipherSuite, groupID GroupID, li leafIndex) bool {
+func (node *leafNode) verifySignature(cs CipherSuite, groupID GroupID, li leafIndex) bool {
 	leafNodeTBS, err := marshal(&leafNodeTBS{
 		leafNode:  node,
 		groupID:   groupID,
@@ -424,7 +424,7 @@ func (node *leafNode) verify(options *leafNodeVerifyOptions) error {
 }
 
 type leafNodeVerifyOptions struct {
-	cipherSuite    cipherSuite
+	cipherSuite    CipherSuite
 	groupID        GroupID
 	leafIndex      leafIndex
 	supportedCreds map[credentialType]struct{}
@@ -462,7 +462,7 @@ func (node *updatePathNode) marshal(b *cryptobyte.Builder) {
 	})
 }
 
-func decryptPathSecret(cs cipherSuite, nodePriv []byte, ctx *groupContext, ciphertext hpkeCiphertext) ([]byte, error) {
+func decryptPathSecret(cs CipherSuite, nodePriv []byte, ctx *groupContext, ciphertext hpkeCiphertext) ([]byte, error) {
 	rawCtx, err := marshal(ctx)
 	if err != nil {
 		return nil, err
@@ -470,7 +470,7 @@ func decryptPathSecret(cs cipherSuite, nodePriv []byte, ctx *groupContext, ciphe
 	return cs.decryptWithLabel(nodePriv, []byte("UpdatePathNode"), rawCtx, ciphertext.kemOutput, ciphertext.ciphertext)
 }
 
-func nodePrivFromPathSecret(cs cipherSuite, pathSecret []byte, nodePub hpkePublicKey) ([]byte, error) {
+func nodePrivFromPathSecret(cs CipherSuite, pathSecret []byte, nodePub hpkePublicKey) ([]byte, error) {
 	nodeSecret, err := cs.deriveSecret(pathSecret, []byte("node"))
 	if err != nil {
 		return nil, err
@@ -803,11 +803,11 @@ func hasUnmergedLeaf(node *parentNode, unmergedLeaf leafIndex) bool {
 	return false
 }
 
-func (tree ratchetTree) computeRootTreeHash(cs cipherSuite) ([]byte, error) {
+func (tree ratchetTree) computeRootTreeHash(cs CipherSuite) ([]byte, error) {
 	return tree.computeTreeHash(cs, tree.numLeaves().root(), nil)
 }
 
-func (tree ratchetTree) computeTreeHash(cs cipherSuite, x nodeIndex, exclude map[leafIndex]struct{}) ([]byte, error) {
+func (tree ratchetTree) computeTreeHash(cs CipherSuite, x nodeIndex, exclude map[leafIndex]struct{}) ([]byte, error) {
 	n := tree.get(x)
 
 	var b cryptobyte.Builder
@@ -890,7 +890,7 @@ func marshalParentNodeHashInput(b *cryptobyte.Builder, node *parentNode, leftHas
 	writeOpaqueVec(b, rightHash)
 }
 
-func (tree ratchetTree) verifyParentHashes(cs cipherSuite) bool {
+func (tree ratchetTree) verifyParentHashes(cs CipherSuite) bool {
 	for i, node := range tree {
 		if node == nil {
 			continue
@@ -1104,7 +1104,7 @@ func (tree ratchetTree) filteredDirectPath(x nodeIndex) []nodeIndex {
 	return path
 }
 
-func (tree ratchetTree) mergeUpdatePath(cs cipherSuite, senderLeafIndex leafIndex, path *updatePath) error {
+func (tree ratchetTree) mergeUpdatePath(cs CipherSuite, senderLeafIndex leafIndex, path *updatePath) error {
 	senderNodeIndex := senderLeafIndex.nodeIndex()
 	numLeaves := tree.numLeaves()
 
@@ -1175,7 +1175,7 @@ func (tree ratchetTree) mergeUpdatePath(cs cipherSuite, senderLeafIndex leafInde
 	return nil
 }
 
-func (tree ratchetTree) decryptPathSecrets(cs cipherSuite, groupCtx *groupContext, senderLeafIndex, recipientLeafIndex leafIndex, path *updatePath, privTree [][]byte) ([]byte, error) {
+func (tree ratchetTree) decryptPathSecrets(cs CipherSuite, groupCtx *groupContext, senderLeafIndex, recipientLeafIndex leafIndex, path *updatePath, privTree [][]byte) ([]byte, error) {
 	senderNodeIndex := senderLeafIndex.nodeIndex()
 	recipientNodeIndex := recipientLeafIndex.nodeIndex()
 

@@ -7,7 +7,7 @@ import (
 )
 
 type pskSecretTest struct {
-	CipherSuite cipherSuite `json:"cipher_suite"`
+	CipherSuite CipherSuite `json:"cipher_suite"`
 
 	PSKs []struct {
 		PSKID    testBytes `json:"psk_id"`
@@ -53,7 +53,7 @@ func TestPSKSecret(t *testing.T) {
 }
 
 type keyScheduleTest struct {
-	CipherSuite cipherSuite `json:"cipher_suite"`
+	CipherSuite CipherSuite `json:"cipher_suite"`
 
 	GroupID           testBytes `json:"group_id"`
 	InitialInitSecret testBytes `json:"initial_init_secret"`
@@ -191,7 +191,7 @@ func TestKeySchedule(t *testing.T) {
 }
 
 type transcriptHashesTest struct {
-	CipherSuite cipherSuite `json:"cipher_suite"`
+	CipherSuite CipherSuite `json:"cipher_suite"`
 
 	ConfirmationKey             testBytes `json:"confirmation_key"`
 	AuthenticatedContent        testBytes `json:"authenticated_content"`

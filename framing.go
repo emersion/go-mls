@@ -260,7 +260,7 @@ type authenticatedContent struct {
 	auth       framedContentAuthData
 }
 
-func signAuthenticatedContent(cs cipherSuite, signKey []byte, wf wireFormat, content *framedContent, ctx *groupContext) (*authenticatedContent, error) {
+func signAuthenticatedContent(cs CipherSuite, signKey []byte, wf wireFormat, content *framedContent, ctx *groupContext) (*authenticatedContent, error) {
 	authContent := authenticatedContent{
 		wireFormat: wf,
 		content:    *content,
@@ -310,11 +310,11 @@ func (authContent *authenticatedContent) framedContentTBS(ctx *groupContext) *fr
 	}
 }
 
-func (authContent *authenticatedContent) verifySignature(cs cipherSuite, verifKey []byte, ctx *groupContext) bool {
+func (authContent *authenticatedContent) verifySignature(cs CipherSuite, verifKey []byte, ctx *groupContext) bool {
 	return authContent.auth.verifySignature(cs, verifKey, authContent.framedContentTBS(ctx))
 }
 
-func (authContent *authenticatedContent) generateProposalRef(cs cipherSuite) (proposalRef, error) {
+func (authContent *authenticatedContent) generateProposalRef(cs CipherSuite) (proposalRef, error) {
 	if authContent.content.contentType != contentTypeProposal {
 		panic("mls: AuthenticatedContent is not a proposal")
 	}
@@ -363,14 +363,14 @@ func (authData *framedContentAuthData) marshal(b *cryptobyte.Builder, ct content
 	}
 }
 
-func (authData *framedContentAuthData) verifyConfirmationTag(cs cipherSuite, confirmationKey, confirmedTranscriptHash []byte) bool {
+func (authData *framedContentAuthData) verifyConfirmationTag(cs CipherSuite, confirmationKey, confirmedTranscriptHash []byte) bool {
 	if len(authData.confirmationTag) == 0 {
 		return false
 	}
 	return cs.verifyMAC(confirmationKey, confirmedTranscriptHash, authData.confirmationTag)
 }
 
-func (authData *framedContentAuthData) verifySignature(cs cipherSuite, verifKey []byte, content *framedContentTBS) bool {
+func (authData *framedContentAuthData) verifySignature(cs CipherSuite, verifKey []byte, content *framedContentTBS) bool {
 	rawContent, err := marshal(content)
 	if err != nil {
 		return false
@@ -378,7 +378,7 @@ func (authData *framedContentAuthData) verifySignature(cs cipherSuite, verifKey 
 	return cs.verifyWithLabel(verifKey, []byte("FramedContentTBS"), rawContent, authData.signature)
 }
 
-func signFramedContent(cs cipherSuite, signKey []byte, content *framedContentTBS) ([]byte, error) {
+func signFramedContent(cs CipherSuite, signKey []byte, content *framedContentTBS) ([]byte, error) {
 	rawContent, err := marshal(content)
 	if err != nil {
 		return nil, err
@@ -409,7 +409,7 @@ type publicMessage struct {
 	membershipTag []byte // for senderTypeMember
 }
 
-func signPublicMessage(cs cipherSuite, signKey []byte, content *framedContent, ctx *groupContext) (*publicMessage, error) {
+func signPublicMessage(cs CipherSuite, signKey []byte, content *framedContent, ctx *groupContext) (*publicMessage, error) {
 	authContent, err := signAuthenticatedContent(cs, signKey, wireFormatMLSPublicMessage, content, ctx)
 	if err != nil {
 		return nil, err
@@ -463,7 +463,7 @@ func (msg *publicMessage) authenticatedContentTBM(ctx *groupContext) *authentica
 	}
 }
 
-func (msg *publicMessage) signMembershipTag(cs cipherSuite, membershipKey []byte, ctx *groupContext) error {
+func (msg *publicMessage) signMembershipTag(cs CipherSuite, membershipKey []byte, ctx *groupContext) error {
 	if msg.content.sender.senderType != senderTypeMember {
 		return nil
 	}
@@ -475,7 +475,7 @@ func (msg *publicMessage) signMembershipTag(cs cipherSuite, membershipKey []byte
 	return nil
 }
 
-func (msg *publicMessage) verifyMembershipTag(cs cipherSuite, membershipKey []byte, ctx *groupContext) bool {
+func (msg *publicMessage) verifyMembershipTag(cs CipherSuite, membershipKey []byte, ctx *groupContext) bool {
 	if msg.content.sender.senderType != senderTypeMember {
 		return true // there is no membership tag
 	}
@@ -505,7 +505,7 @@ type privateMessage struct {
 	ciphertext          []byte
 }
 
-func encryptPrivateMessage(cs cipherSuite, signPriv []byte, secret ratchetSecret, senderDataSecret []byte, content *framedContent, senderData *senderData, ctx *groupContext) (*privateMessage, error) {
+func encryptPrivateMessage(cs CipherSuite, signPriv []byte, secret ratchetSecret, senderDataSecret []byte, content *framedContent, senderData *senderData, ctx *groupContext) (*privateMessage, error) {
 	ciphertext, err := encryptPrivateMessageContent(cs, signPriv, secret, content, ctx, senderData.reuseGuard)
 	if err != nil {
 		return nil, err
@@ -552,7 +552,7 @@ func (msg *privateMessage) marshal(b *cryptobyte.Builder) {
 	writeOpaqueVec(b, msg.ciphertext)
 }
 
-func (msg *privateMessage) decryptSenderData(cs cipherSuite, senderDataSecret []byte) (*senderData, error) {
+func (msg *privateMessage) decryptSenderData(cs CipherSuite, senderDataSecret []byte) (*senderData, error) {
 	key, err := expandSenderDataKey(cs, senderDataSecret, msg.ciphertext)
 	if err != nil {
 		return nil, err
@@ -591,7 +591,7 @@ func (msg *privateMessage) decryptSenderData(cs cipherSuite, senderDataSecret []
 	return &senderData, nil
 }
 
-func (msg *privateMessage) decryptContent(cs cipherSuite, secret ratchetSecret, reuseGuard [4]byte) (*privateMessageContent, error) {
+func (msg *privateMessage) decryptContent(cs CipherSuite, secret ratchetSecret, reuseGuard [4]byte) (*privateMessageContent, error) {
 	key, nonce, err := derivePrivateMessageKeyAndNonce(cs, secret, reuseGuard)
 	if err != nil {
 		return nil, err
@@ -634,7 +634,7 @@ func (msg *privateMessage) decryptContent(cs cipherSuite, secret ratchetSecret, 
 	return &content, nil
 }
 
-func derivePrivateMessageKeyAndNonce(cs cipherSuite, secret ratchetSecret, reuseGuard [4]byte) (key, nonce []byte, err error) {
+func derivePrivateMessageKeyAndNonce(cs CipherSuite, secret ratchetSecret, reuseGuard [4]byte) (key, nonce []byte, err error) {
 	key, err = secret.deriveKey(cs)
 	if err != nil {
 		return nil, nil, err
@@ -744,7 +744,7 @@ func (content *privateMessageContent) marshal(b *cryptobyte.Builder, ct contentT
 	content.auth.marshal(b, ct)
 }
 
-func encryptPrivateMessageContent(cs cipherSuite, signKey []byte, secret ratchetSecret, content *framedContent, ctx *groupContext, reuseGuard [4]byte) ([]byte, error) {
+func encryptPrivateMessageContent(cs CipherSuite, signKey []byte, secret ratchetSecret, content *framedContent, ctx *groupContext, reuseGuard [4]byte) ([]byte, error) {
 	authContent, err := signAuthenticatedContent(cs, signKey, wireFormatMLSPrivateMessage, content, ctx)
 	if err != nil {
 		return nil, err
@@ -788,7 +788,7 @@ func encryptPrivateMessageContent(cs cipherSuite, signKey []byte, secret ratchet
 	return cipher.Seal(nil, nonce, plaintext, rawAAD), nil
 }
 
-func encryptSenderData(cs cipherSuite, senderDataSecret []byte, senderData *senderData, content *framedContent, ciphertext []byte) ([]byte, error) {
+func encryptSenderData(cs CipherSuite, senderDataSecret []byte, senderData *senderData, content *framedContent, ciphertext []byte) ([]byte, error) {
 	key, err := expandSenderDataKey(cs, senderDataSecret, ciphertext)
 	if err != nil {
 		return nil, err
@@ -852,19 +852,19 @@ func (data *senderData) marshal(b *cryptobyte.Builder) {
 	b.AddBytes(data.reuseGuard[:])
 }
 
-func expandSenderDataKey(cs cipherSuite, senderDataSecret, ciphertext []byte) ([]byte, error) {
+func expandSenderDataKey(cs CipherSuite, senderDataSecret, ciphertext []byte) ([]byte, error) {
 	_, _, aead := cs.hpke().Params()
 	ciphertextSample := sampleCiphertext(cs, ciphertext)
 	return cs.expandWithLabel(senderDataSecret, []byte("key"), ciphertextSample, uint16(aead.KeySize()))
 }
 
-func expandSenderDataNonce(cs cipherSuite, senderDataSecret, ciphertext []byte) ([]byte, error) {
+func expandSenderDataNonce(cs CipherSuite, senderDataSecret, ciphertext []byte) ([]byte, error) {
 	_, _, aead := cs.hpke().Params()
 	ciphertextSample := sampleCiphertext(cs, ciphertext)
 	return cs.expandWithLabel(senderDataSecret, []byte("nonce"), ciphertextSample, uint16(aead.NonceSize()))
 }
 
-func sampleCiphertext(cs cipherSuite, ciphertext []byte) []byte {
+func sampleCiphertext(cs CipherSuite, ciphertext []byte) []byte {
 	_, kdf, _ := cs.hpke().Params()
 	n := kdf.ExtractSize()
 	if len(ciphertext) < n {
