@@ -240,6 +240,27 @@ func (cs CipherSuite) decryptWithLabel(privateKey, label, context, kemOutput, ci
 	return opener.Open(ciphertext, nil)
 }
 
+func (cs CipherSuite) generateEncryptionKeyPair() (publicKey, privateKey []byte, err error) {
+	hpke := cs.hpke()
+	kem, _, _ := hpke.Params()
+	pub, priv, err := kem.Scheme().GenerateKeyPair()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	rawPub, err := pub.MarshalBinary()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	rawPriv, err := priv.MarshalBinary()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return rawPub, rawPriv, nil
+}
+
 func marshalSignContent(label, content []byte) ([]byte, error) {
 	label = append([]byte("MLS 1.0 "), label...)
 
