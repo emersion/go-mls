@@ -282,6 +282,7 @@ func marshalEncryptContext(label, context []byte) ([]byte, error) {
 type signatureScheme interface {
 	Sign(signKey, message []byte) ([]byte, error)
 	Verify(publicKey, message, sig []byte) bool
+	GenerateKeyPair() (publicKey, privateKey []byte, err error)
 }
 
 type ed25519SignatureScheme struct{}
@@ -299,6 +300,14 @@ func (ed25519SignatureScheme) Verify(publicKey, message, sig []byte) bool {
 		return false
 	}
 	return ed25519.Verify(ed25519.PublicKey(publicKey), message, sig)
+}
+
+func (ed25519SignatureScheme) GenerateKeyPair() (publicKey, privateKey []byte, err error) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, nil, err
+	}
+	return []byte(pub), priv.Seed(), nil
 }
 
 type ecdsaSignatureScheme struct {
@@ -328,6 +337,15 @@ func (scheme ecdsaSignatureScheme) Verify(publicKey, message, sig []byte) bool {
 	return ecdsa.VerifyASN1(pub, scheme.hashSum(message), sig)
 }
 
+func (scheme ecdsaSignatureScheme) GenerateKeyPair() (publicKey, privateKey []byte, err error) {
+	priv, err := ecdsa.GenerateKey(scheme.curve, rand.Reader)
+	if err != nil {
+		return nil, nil, err
+	}
+	pub := priv.PublicKey
+	return elliptic.Marshal(pub.Curve, pub.X, pub.Y), priv.D.Bytes(), nil
+}
+
 type ed448SignatureScheme struct{}
 
 func (ed448SignatureScheme) Sign(signKey, message []byte) ([]byte, error) {
@@ -343,4 +361,12 @@ func (ed448SignatureScheme) Verify(publicKey, message, sig []byte) bool {
 		return false
 	}
 	return ed448.Verify(ed448.PublicKey(publicKey), message, sig, "")
+}
+
+func (ed448SignatureScheme) GenerateKeyPair() (publicKey, privateKey []byte, err error) {
+	pub, priv, err := ed448.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, nil, err
+	}
+	return []byte(pub), priv.Seed(), nil
 }
