@@ -254,12 +254,20 @@ func (group *Group) UnmarshalAndProcessMessage(raw []byte) error {
 	var msg mlsMessage
 	if err := unmarshal([]byte(raw), &msg); err != nil {
 		return fmt.Errorf("failed to unmarshal MLS message: %v", err)
-	} else if msg.wireFormat != wireFormatMLSPublicMessage {
+	}
+
+	switch msg.wireFormat {
+	case wireFormatMLSPublicMessage:
+		return group.processPublicMessage(msg.publicMessage)
+	case wireFormatMLSPrivateMessage:
+		return group.processPrivateMessage(msg.privateMessage)
+	default:
 		// TODO: support other wire formats
 		return fmt.Errorf("mls: unsupported wire format: %v", msg.wireFormat)
 	}
-	pubMsg := msg.publicMessage
+}
 
+func (group *Group) processPublicMessage(pubMsg *publicMessage) error {
 	authContent, err := group.verifyPublicMessage(pubMsg)
 	if err != nil {
 		return fmt.Errorf("failed to verify public message: %v", err)
@@ -310,6 +318,79 @@ func (group *Group) verifyPublicMessage(pubMsg *publicMessage) (*authenticatedCo
 	}
 
 	return authContent, nil
+}
+
+func (group *Group) processPrivateMessage(privMsg *privateMessage) error {
+	cs := group.groupContext.cipherSuite
+
+	if !privMsg.groupID.Equal(group.groupContext.groupID) {
+		return fmt.Errorf("mls: message group ID mismatch")
+	}
+	if privMsg.epoch != group.groupContext.epoch {
+		return fmt.Errorf("mls: epoch mismatch: got %v, want %v", privMsg.epoch, group.groupContext.epoch)
+	}
+
+	senderDataSecret, err := cs.deriveSecret(group.epochSecret, secretLabelSenderData)
+	if err != nil {
+		return fmt.Errorf("failed to derive sender data secret: %v", err)
+	}
+
+	senderData, err := privMsg.decryptSenderData(cs, senderDataSecret)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt sender data: %v", err)
+	}
+
+	encryptionSecret, err := cs.deriveSecret(group.epochSecret, secretLabelEncryption)
+	if err != nil {
+		return fmt.Errorf("failed to derive encryption secret: %v", err)
+	}
+
+	secretTree, err := deriveSecretTree(cs, group.tree.numLeaves(), encryptionSecret)
+	if err != nil {
+		return fmt.Errorf("failed to erive secret tree: %v", err)
+	}
+
+	label := ratchetLabelFromContentType(privMsg.contentType)
+	secret, err := secretTree.deriveRatchetRoot(cs, senderData.leafIndex.nodeIndex(), label)
+	if err != nil {
+		return fmt.Errorf("failed to derive secret ratchet tree root: %v", err)
+	}
+
+	// TODO: limit number of iterations
+	// TODO: erase knowledge about used generations to ensure forward secrecy
+	for secret.generation != senderData.generation {
+		secret, err = secret.deriveNext(cs)
+		if err != nil {
+			return fmt.Errorf("failed to derive next ratchet secret: %v", err)
+		}
+	}
+
+	privContent, err := privMsg.decryptContent(cs, secret, senderData.reuseGuard)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt private message content: %v", err)
+	}
+
+	signerNode := group.tree.getLeaf(senderData.leafIndex)
+	if signerNode == nil {
+		return fmt.Errorf("mls: signer node is blank")
+	}
+
+	authContent := privMsg.authenticatedContent(senderData, privContent)
+	if !authContent.verifySignature(signerNode.signatureKey, &group.groupContext) {
+		return fmt.Errorf("failed to verify private message content signature: %v", err)
+	}
+
+	switch authContent.content.contentType {
+	case contentTypeProposal:
+		return group.processProposal(authContent)
+	case contentTypeCommit:
+		return group.processCommit(authContent, nil, nil, nil)
+	case contentTypeApplication:
+		return nil // TODO: return applicationData to the user
+	default:
+		// TODO: support other content types
+		return fmt.Errorf("mls: unsupported content type: %v", authContent.content.contentType)
+	}
 }
 
 func (group *Group) processProposal(authContent *authenticatedContent) error {
