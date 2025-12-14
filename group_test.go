@@ -292,7 +292,13 @@ func TestGroup(t *testing.T) {
 		t.Fatalf("GenerateKeyPairPackage() = %v", err)
 	}
 
-	_ = aliceKeyPairPkg
+	groupID := GroupID("비밀")
+	aliceGroup, err := CreateGroup(groupID, aliceKeyPairPkg)
+	if err != nil {
+		t.Fatalf("CreateGroup() = %v", err)
+	}
+
+	_ = aliceGroup
 	_ = bobKeyPairPkg
 	// TODO
 }

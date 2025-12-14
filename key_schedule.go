@@ -83,6 +83,18 @@ func (ctx *groupContext) extractEpochSecret(joinerSecret, pskSecret []byte) ([]b
 	return cs.expandWithLabel(extracted, []byte("epoch"), rawGroupContext, uint16(kdf.ExtractSize()))
 }
 
+func (ctx *groupContext) signConfirmationTag(epochSecret []byte) ([]byte, error) {
+	cs := ctx.cipherSuite
+
+	confirmationKey, err := cs.deriveSecret(epochSecret, secretLabelConfirm)
+	if err != nil {
+		return nil, err
+	}
+
+	confirmationTag := cs.signMAC(confirmationKey, ctx.confirmedTranscriptHash)
+	return confirmationTag, nil
+}
+
 func extractWelcomeSecret(cs CipherSuite, joinerSecret, pskSecret []byte) ([]byte, error) {
 	_, kdf, _ := cs.hpke().Params()
 
