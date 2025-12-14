@@ -33,6 +33,20 @@ func UnmarshalKeyPackage(raw []byte) (*KeyPackage, error) {
 	return msg.keyPackage, nil
 }
 
+// Bytes encodes the key package.
+func (pkg *KeyPackage) Bytes() []byte {
+	raw, err := marshal(&mlsMessage{
+		version:    protocolVersionMLS10,
+		wireFormat: wireFormatMLSKeyPackage,
+		keyPackage: pkg,
+	})
+	if err != nil {
+		// should never happen
+		panic(fmt.Errorf("mls: failed to marshal key package message: %v", err))
+	}
+	return raw
+}
+
 func (pkg *KeyPackage) unmarshal(s *cryptobyte.String) error {
 	*pkg = KeyPackage{}
 
