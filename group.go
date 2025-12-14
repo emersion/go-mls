@@ -602,6 +602,37 @@ func (info *groupInfo) verifyConfirmationTag(joinerSecret, pskSecret []byte) boo
 	return cs.verifyMAC(confirmationKey, info.groupContext.confirmedTranscriptHash, info.confirmationTag)
 }
 
+func (info *groupInfo) encrypt(joinerSecret, pskSecret []byte) ([]byte, error) {
+	cs := info.groupContext.cipherSuite
+	_, _, aead := cs.hpke().Params()
+
+	welcomeSecret, err := extractWelcomeSecret(cs, joinerSecret, pskSecret)
+	if err != nil {
+		return nil, err
+	}
+
+	welcomeNonce, err := cs.expandWithLabel(welcomeSecret, []byte("nonce"), nil, uint16(aead.NonceSize()))
+	if err != nil {
+		return nil, err
+	}
+	welcomeKey, err := cs.expandWithLabel(welcomeSecret, []byte("key"), nil, uint16(aead.KeySize()))
+	if err != nil {
+		return nil, err
+	}
+
+	cipher, err := aead.New(welcomeKey)
+	if err != nil {
+		return nil, err
+	}
+
+	rawGroupInfo, err := marshal(info)
+	if err != nil {
+		return nil, err
+	}
+
+	return cipher.Seal(nil, welcomeNonce, rawGroupInfo, nil), nil
+}
+
 type groupInfoTBS groupInfo
 
 func (info *groupInfoTBS) marshal(b *cryptobyte.Builder) {
