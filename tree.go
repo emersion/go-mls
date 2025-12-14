@@ -365,6 +365,23 @@ func (node *leafNodeTBS) marshal(b *cryptobyte.Builder) {
 	}
 }
 
+func (node *leafNode) sign(cs CipherSuite, groupID GroupID, li leafIndex, signerPriv []byte) error {
+	leafNodeTBS, err := marshal(&leafNodeTBS{
+		leafNode:  node,
+		groupID:   groupID,
+		leafIndex: li,
+	})
+	if err != nil {
+		return err
+	}
+	sig, err := cs.signWithLabel(signerPriv, []byte("LeafNodeTBS"), leafNodeTBS)
+	if err != nil {
+		return err
+	}
+	node.signature = sig
+	return nil
+}
+
 // verifySignature verifies the signature of the leaf node.
 //
 // groupID and li can be left unspecified if the leaf node source is neither
