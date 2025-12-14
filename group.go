@@ -701,6 +701,23 @@ func (sec *groupSecrets) verifySingleReinitOrBranchPSK() bool {
 	return n <= 1
 }
 
+func (sec *groupSecrets) encrypt(cs CipherSuite, initKey, encryptedGroupInfo []byte) (*hpkeCiphertext, error) {
+	rawGroupSecrets, err := marshal(sec)
+	if err != nil {
+		return nil, err
+	}
+
+	kemOutput, ciphertext, err := cs.encryptWithLabel(initKey, []byte("Welcome"), encryptedGroupInfo, rawGroupSecrets)
+	if err != nil {
+		return nil, err
+	}
+
+	return &hpkeCiphertext{
+		kemOutput:  kemOutput,
+		ciphertext: ciphertext,
+	}, nil
+}
+
 // A Welcome message includes secret keying information necessary to join a
 // group.
 type Welcome struct {
