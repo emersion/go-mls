@@ -475,6 +475,20 @@ func (info *groupInfo) verifySignature(signerPub signaturePublicKey) bool {
 	return cs.verifyWithLabel([]byte(signerPub), []byte("GroupInfoTBS"), tbs, info.signature)
 }
 
+func (info *groupInfo) sign(signerPriv []byte) error {
+	cs := info.groupContext.cipherSuite
+	tbs, err := marshal((*groupInfoTBS)(info))
+	if err != nil {
+		return err
+	}
+	sig, err := cs.signWithLabel(signerPriv, []byte("GroupInfoTBS"), tbs)
+	if err != nil {
+		return err
+	}
+	info.signature = sig
+	return nil
+}
+
 func (info *groupInfo) verifyConfirmationTag(joinerSecret, pskSecret []byte) bool {
 	cs := info.groupContext.cipherSuite
 	epochSecret, err := info.groupContext.extractEpochSecret(joinerSecret, pskSecret)
