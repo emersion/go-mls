@@ -317,7 +317,7 @@ func TestGroup(t *testing.T) {
 		t.Fatalf("CreateApplicationMessage() = %v", err)
 	}
 
-	_ = bobGroup
-	_ = appMsg
-	// TODO
+	if err := bobGroup.UnmarshalAndProcessMessage(appMsg); err != nil {
+		t.Fatalf("UnmarshalAndProcessMessage() = %v", err)
+	}
 }
