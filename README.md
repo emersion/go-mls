@@ -1,5 +1,7 @@
 # go-mls
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/emersion/go-mls.svg)](https://pkg.go.dev/github.com/emersion/go-mls)
+
 A Go library for [MLS].
 
 This library is a **work-in-progress** and has not yet been audited for
