@@ -3,6 +3,7 @@ package mls
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"testing"
 )
 
@@ -279,50 +280,50 @@ func TestMessageProtection(t *testing.T) {
 	}
 }
 
-func TestGroup(t *testing.T) {
+func ExampleGroup() {
 	cs := CipherSuiteMLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
 
 	aliceKeyPairPkg, err := GenerateKeyPairPackage(cs)
 	if err != nil {
-		t.Fatalf("GenerateKeyPairPackage() = %v", err)
+		log.Fatalf("GenerateKeyPairPackage() = %v", err)
 	}
 
 	bobKeyPairPkg, err := GenerateKeyPairPackage(cs)
 	if err != nil {
-		t.Fatalf("GenerateKeyPairPackage() = %v", err)
+		log.Fatalf("GenerateKeyPairPackage() = %v", err)
 	}
 
 	groupID := GroupID("비밀")
 	aliceGroup, err := CreateGroup(groupID, aliceKeyPairPkg)
 	if err != nil {
-		t.Fatalf("CreateGroup() = %v", err)
+		log.Fatalf("CreateGroup() = %v", err)
 	}
 
 	bobWelcome, addMemberMsg, err := aliceGroup.CreateWelcome(&bobKeyPairPkg.Public)
 	if err != nil {
-		t.Fatalf("CreateWelcome() = %v", err)
+		log.Fatalf("CreateWelcome() = %v", err)
 	}
 
 	if _, err := aliceGroup.UnmarshalAndProcessMessage(addMemberMsg); err != nil {
-		t.Fatalf("UnmarshalAndProcessMessage() = %v", err)
+		log.Fatalf("UnmarshalAndProcessMessage() = %v", err)
 	}
 
 	bobGroup, err := GroupFromWelcome(bobWelcome, bobKeyPairPkg)
 	if err != nil {
-		t.Fatalf("GroupFromWelcome() = %v", err)
+		log.Fatalf("GroupFromWelcome() = %v", err)
 	}
 
 	data := []byte("안녕하세요")
 	appMsg, err := aliceGroup.CreateApplicationMessage(data)
 	if err != nil {
-		t.Fatalf("CreateApplicationMessage() = %v", err)
+		log.Fatalf("CreateApplicationMessage() = %v", err)
 	}
 
 	plaintext, err := bobGroup.UnmarshalAndProcessMessage(appMsg)
 	if err != nil {
-		t.Fatalf("UnmarshalAndProcessMessage() = %v", err)
+		log.Fatalf("UnmarshalAndProcessMessage() = %v", err)
 	}
-	if string(plaintext) != string(data) {
-		t.Errorf("UnmarshalAndProcessMessage() = %v, want %v", plaintext, data)
-	}
+
+	fmt.Println(string(plaintext))
+	// Output: 안녕하세요
 }
