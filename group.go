@@ -250,20 +250,23 @@ func processPathSecret(cs CipherSuite, tree ratchetTree, privTree [][]byte, path
 
 // UnmarshalAndProcessMessage decodes a raw MLS message intended for the group
 // and processes it.
-func (group *Group) UnmarshalAndProcessMessage(raw []byte) error {
+//
+// If the MLS message contains encrypted application data, the decrypted data
+// is returned.
+func (group *Group) UnmarshalAndProcessMessage(raw []byte) ([]byte, error) {
 	var msg mlsMessage
 	if err := unmarshal([]byte(raw), &msg); err != nil {
-		return fmt.Errorf("failed to unmarshal MLS message: %v", err)
+		return nil, fmt.Errorf("failed to unmarshal MLS message: %v", err)
 	}
 
 	switch msg.wireFormat {
 	case wireFormatMLSPublicMessage:
-		return group.processPublicMessage(msg.publicMessage)
+		return nil, group.processPublicMessage(msg.publicMessage)
 	case wireFormatMLSPrivateMessage:
 		return group.processPrivateMessage(msg.privateMessage)
 	default:
 		// TODO: support other wire formats
-		return fmt.Errorf("mls: unsupported wire format: %v", msg.wireFormat)
+		return nil, fmt.Errorf("mls: unsupported wire format: %v", msg.wireFormat)
 	}
 }
 
@@ -320,40 +323,40 @@ func (group *Group) verifyPublicMessage(pubMsg *publicMessage) (*authenticatedCo
 	return authContent, nil
 }
 
-func (group *Group) processPrivateMessage(privMsg *privateMessage) error {
+func (group *Group) processPrivateMessage(privMsg *privateMessage) ([]byte, error) {
 	cs := group.groupContext.cipherSuite
 
 	if !privMsg.groupID.Equal(group.groupContext.groupID) {
-		return fmt.Errorf("mls: message group ID mismatch")
+		return nil, fmt.Errorf("mls: message group ID mismatch")
 	}
 	if privMsg.epoch != group.groupContext.epoch {
-		return fmt.Errorf("mls: epoch mismatch: got %v, want %v", privMsg.epoch, group.groupContext.epoch)
+		return nil, fmt.Errorf("mls: epoch mismatch: got %v, want %v", privMsg.epoch, group.groupContext.epoch)
 	}
 
 	senderDataSecret, err := cs.deriveSecret(group.epochSecret, secretLabelSenderData)
 	if err != nil {
-		return fmt.Errorf("failed to derive sender data secret: %v", err)
+		return nil, fmt.Errorf("failed to derive sender data secret: %v", err)
 	}
 
 	senderData, err := privMsg.decryptSenderData(cs, senderDataSecret)
 	if err != nil {
-		return fmt.Errorf("failed to decrypt sender data: %v", err)
+		return nil, fmt.Errorf("failed to decrypt sender data: %v", err)
 	}
 
 	encryptionSecret, err := cs.deriveSecret(group.epochSecret, secretLabelEncryption)
 	if err != nil {
-		return fmt.Errorf("failed to derive encryption secret: %v", err)
+		return nil, fmt.Errorf("failed to derive encryption secret: %v", err)
 	}
 
 	secretTree, err := deriveSecretTree(cs, group.tree.numLeaves(), encryptionSecret)
 	if err != nil {
-		return fmt.Errorf("failed to erive secret tree: %v", err)
+		return nil, fmt.Errorf("failed to erive secret tree: %v", err)
 	}
 
 	label := ratchetLabelFromContentType(privMsg.contentType)
 	secret, err := secretTree.deriveRatchetRoot(cs, senderData.leafIndex.nodeIndex(), label)
 	if err != nil {
-		return fmt.Errorf("failed to derive secret ratchet tree root: %v", err)
+		return nil, fmt.Errorf("failed to derive secret ratchet tree root: %v", err)
 	}
 
 	// TODO: limit number of iterations
@@ -361,35 +364,35 @@ func (group *Group) processPrivateMessage(privMsg *privateMessage) error {
 	for secret.generation != senderData.generation {
 		secret, err = secret.deriveNext(cs)
 		if err != nil {
-			return fmt.Errorf("failed to derive next ratchet secret: %v", err)
+			return nil, fmt.Errorf("failed to derive next ratchet secret: %v", err)
 		}
 	}
 
 	privContent, err := privMsg.decryptContent(cs, secret, senderData.reuseGuard)
 	if err != nil {
-		return fmt.Errorf("failed to decrypt private message content: %v", err)
+		return nil, fmt.Errorf("failed to decrypt private message content: %v", err)
 	}
 
 	signerNode := group.tree.getLeaf(senderData.leafIndex)
 	if signerNode == nil {
-		return fmt.Errorf("mls: signer node is blank")
+		return nil, fmt.Errorf("mls: signer node is blank")
 	}
 
 	authContent := privMsg.authenticatedContent(senderData, privContent)
 	if !authContent.verifySignature(signerNode.signatureKey, &group.groupContext) {
-		return fmt.Errorf("failed to verify private message content signature: %v", err)
+		return nil, fmt.Errorf("failed to verify private message content signature: %v", err)
 	}
 
 	switch authContent.content.contentType {
 	case contentTypeProposal:
-		return group.processProposal(authContent)
+		return nil, group.processProposal(authContent)
 	case contentTypeCommit:
-		return group.processCommit(authContent, nil, nil, nil)
+		return nil, group.processCommit(authContent, nil, nil, nil)
 	case contentTypeApplication:
-		return nil // TODO: return applicationData to the user
+		return authContent.content.applicationData, nil
 	default:
 		// TODO: support other content types
-		return fmt.Errorf("mls: unsupported content type: %v", authContent.content.contentType)
+		return nil, fmt.Errorf("mls: unsupported content type: %v", authContent.content.contentType)
 	}
 }
 
