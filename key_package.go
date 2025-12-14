@@ -76,6 +76,23 @@ func (pkg *KeyPackage) marshal(b *cryptobyte.Builder) {
 	writeOpaqueVec(b, pkg.signature)
 }
 
+func (pkg *KeyPackage) sign(signerPriv []byte) error {
+	var b cryptobyte.Builder
+	pkg.marshalTBS(&b)
+	rawTBS, err := b.Bytes()
+	if err != nil {
+		return err
+	}
+
+	sig, err := pkg.cipherSuite.signWithLabel(signerPriv, []byte("KeyPackageTBS"), rawTBS)
+	if err != nil {
+		return err
+	}
+
+	pkg.signature = sig
+	return nil
+}
+
 func (pkg *KeyPackage) verifySignature() bool {
 	var b cryptobyte.Builder
 	pkg.marshalTBS(&b)
