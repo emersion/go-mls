@@ -348,6 +348,15 @@ func (group *Group) processCommit(authContent *authenticatedContent, pskIDs []pr
 	if err := verifyProposalList(proposals, senders, senderLeafIndex); err != nil {
 		return fmt.Errorf("failed to verify proposals: %v", err)
 	}
+
+	for _, prop := range proposals {
+		if prop.proposalType == proposalTypeAdd {
+			if err := prop.add.keyPackage.verify(&group.groupContext); err != nil {
+				return fmt.Errorf("failed to verify add proposal: %v", err)
+			}
+		}
+	}
+
 	// TODO: additional proposal list checks
 
 	if proposalListNeedsPath(proposals) && commit.path == nil {
