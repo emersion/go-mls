@@ -651,6 +651,64 @@ func (group *Group) CreateWelcome(keyPkg *KeyPackage) (*Welcome, []byte, error) 
 	}, rawMsg, nil
 }
 
+// CreateApplicationMessage creates a new encrypted application message for the
+// group. The message contains an arbitrary application-specific payload.
+func (group *Group) CreateApplicationMessage(data []byte) ([]byte, error) {
+	cs := group.groupContext.cipherSuite
+
+	senderData, err := newSenderData(group.myLeafIndex, 0) // TODO: set generation > 0
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sender data: %v", err)
+	}
+
+	encryptionSecret, err := cs.deriveSecret(group.epochSecret, secretLabelEncryption)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive encryption secret: %v", err)
+	}
+
+	secretTree, err := deriveSecretTree(cs, group.tree.numLeaves(), encryptionSecret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to erive secret tree: %v", err)
+	}
+
+	label := ratchetLabelFromContentType(contentTypeApplication)
+	secret, err := secretTree.deriveRatchetRoot(cs, group.myLeafIndex.nodeIndex(), label)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive secret ratchet tree root: %v", err)
+	}
+
+	senderDataSecret, err := cs.deriveSecret(group.epochSecret, secretLabelSenderData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive sender data secret: %v", err)
+	}
+
+	framedContent := framedContent{
+		groupID: group.groupContext.groupID,
+		epoch:   group.groupContext.epoch,
+		sender: sender{
+			senderType: senderTypeMember,
+			leafIndex:  group.myLeafIndex,
+		},
+		contentType:     contentTypeApplication,
+		applicationData: data,
+	}
+	privMsg, err := encryptPrivateMessage(cs, group.signaturePriv, secret, senderDataSecret, &framedContent, senderData, &group.groupContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt private message: %v", err)
+	}
+
+	rawMsg, err := marshal(&mlsMessage{
+		version:        protocolVersionMLS10,
+		wireFormat:     wireFormatMLSPrivateMessage,
+		privateMessage: privMsg,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal private message: %v", err)
+	}
+
+	return rawMsg, nil
+}
+
 type commit struct {
 	proposals []proposalOrRef
 	path      *updatePath // optional
