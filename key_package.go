@@ -204,7 +204,7 @@ func GenerateKeyPairPackage(cs CipherSuite) (*KeyPairPackage, error) {
 			encryptionKey:  encPub,
 			signatureKey:   sigPub,
 			leafNodeSource: leafNodeSourceKeyPackage,
-			credential: credential{
+			credential: Credential{
 				credentialType: credentialTypeBasic,
 				identity:       []byte{},
 			},

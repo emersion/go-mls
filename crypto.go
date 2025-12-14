@@ -20,14 +20,15 @@ const (
 	credentialTypeX509  credentialType = 0x0002
 )
 
-type credential struct {
+// A Credential holds information about a group member's identity.
+type Credential struct {
 	credentialType credentialType
 	identity       []byte   // for credentialTypeBasic
 	certificates   [][]byte // for credentialTypeX509
 }
 
-func (cred *credential) unmarshal(s *cryptobyte.String) error {
-	*cred = credential{}
+func (cred *Credential) unmarshal(s *cryptobyte.String) error {
+	*cred = Credential{}
 
 	if !s.ReadUint16((*uint16)(&cred.credentialType)) {
 		return io.ErrUnexpectedEOF
@@ -53,7 +54,7 @@ func (cred *credential) unmarshal(s *cryptobyte.String) error {
 	}
 }
 
-func (cred *credential) marshal(b *cryptobyte.Builder) {
+func (cred *Credential) marshal(b *cryptobyte.Builder) {
 	b.AddUint16(uint16(cred.credentialType))
 	switch cred.credentialType {
 	case credentialTypeBasic:
