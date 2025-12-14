@@ -312,6 +312,12 @@ func TestGroup(t *testing.T) {
 		t.Fatalf("GroupFromWelcome() = %v", err)
 	}
 
+	appMsg, err := aliceGroup.CreateApplicationMessage([]byte("안녕하세요"))
+	if err != nil {
+		t.Fatalf("CreateApplicationMessage() = %v", err)
+	}
+
 	_ = bobGroup
+	_ = appMsg
 	// TODO
 }
