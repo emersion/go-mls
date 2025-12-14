@@ -25,8 +25,9 @@ type Group struct {
 	epochSecret           []byte
 	initSecret            []byte
 
-	myLeafIndex leafIndex
-	privTree    [][]byte
+	myLeafIndex   leafIndex
+	privTree      [][]byte
+	signaturePriv []byte
 
 	pendingProposals []pendingProposal
 }
@@ -87,6 +88,7 @@ func CreateGroup(groupID GroupID, keyPairPkg *KeyPairPackage) (*Group, error) {
 		tree:                  tree,
 		privTree:              privTree,
 		myLeafIndex:           0,
+		signaturePriv:         keyPairPkg.Private.SignatureKey,
 		groupContext:          groupCtx,
 		interimTranscriptHash: interimTranscriptHash,
 		pskSecret:             pskSecret,
@@ -213,6 +215,7 @@ func groupFromSecrets(welcome *Welcome, keyPairPkg *KeyPairPackage, groupSecrets
 		initSecret:            initSecret,
 		myLeafIndex:           myLeafIndex,
 		privTree:              privTree,
+		signaturePriv:         keyPairPkg.Private.SignatureKey,
 	}, nil
 }
 
@@ -488,6 +491,155 @@ func resolveProposals(proposalOrRefs []proposalOrRef, senderLeafIndex leafIndex,
 	}
 
 	return proposals, senders, nil
+}
+
+// CreateWelcome creates a new welcome message, inviting a new member to the
+// group.
+//
+// The welcome message should be sent to the new member. Alongside the welcome
+// message, a raw MLS message is returned and must be consumed by all existing
+// members of the group to add the new member.
+func (group *Group) CreateWelcome(keyPkg *KeyPackage) (*Welcome, []byte, error) {
+	// TODO: missing steps from section 12.4.1
+	cs := group.groupContext.cipherSuite
+
+	prop := proposal{
+		proposalType: proposalTypeAdd,
+		add:          &add{keyPackage: *keyPkg},
+	}
+
+	// TODO: check proposal list validity per section 12.2
+	commit := commit{
+		proposals: []proposalOrRef{
+			{
+				typ:      proposalOrRefTypeProposal,
+				proposal: &prop,
+			},
+		},
+	}
+
+	newGroupCtx := group.groupContext
+	newGroupCtx.epoch++
+
+	newTree := group.tree.copy()
+	newTree.apply([]proposal{prop}, []leafIndex{group.myLeafIndex})
+
+	// TODO: only recompute parts of the tree affected by proposals
+	var err error
+	newGroupCtx.treeHash, err = newTree.computeRootTreeHash(cs)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to compute root tree hash: %v", err)
+	}
+
+	_, kdf, _ := cs.hpke().Params()
+	commitSecret := make([]byte, kdf.ExtractSize())
+
+	pskSecret, err := extractPSKSecret(cs, nil, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to extract PSK secret: %v", err)
+	}
+
+	framedContent := framedContent{
+		groupID: group.groupContext.groupID,
+		epoch:   group.groupContext.epoch,
+		sender: sender{
+			senderType: senderTypeMember,
+			leafIndex:  group.myLeafIndex,
+		},
+		contentType: contentTypeCommit,
+		commit:      &commit,
+	}
+
+	pubMsg, err := signPublicMessage(cs, group.signaturePriv, &framedContent, &group.groupContext)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to sign public message: %v", err)
+	}
+
+	authContent := pubMsg.authenticatedContent()
+	newGroupCtx.confirmedTranscriptHash, err = authContent.confirmedTranscriptHashInput().hash(cs, group.interimTranscriptHash)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to hash confirmed transcript hash input: %v", err)
+	}
+
+	joinerSecret, err := newGroupCtx.extractJoinerSecret(group.initSecret, commitSecret)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to extract joiner secret: %v", err)
+	}
+
+	epochSecret, err := newGroupCtx.extractEpochSecret(joinerSecret, pskSecret)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to extract epoch secret: %v", err)
+	}
+
+	confirmationTag, err := newGroupCtx.signConfirmationTag(epochSecret)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to sign confirmation tag: %v", err)
+	}
+	pubMsg.auth.confirmationTag = confirmationTag
+
+	membershipKey, err := group.groupContext.cipherSuite.deriveSecret(group.epochSecret, secretLabelMembership)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to derive membership key: %v", err)
+	}
+	if err := pubMsg.signMembershipTag(cs, membershipKey, &group.groupContext); err != nil {
+		return nil, nil, fmt.Errorf("failed to sign public message membership tag: %v", err)
+	}
+
+	rawTree, err := marshal(newTree)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal ratchet tree: %v", err)
+	}
+
+	newGroupInfo := groupInfo{
+		groupContext:    newGroupCtx,
+		confirmationTag: confirmationTag,
+		signer:          group.myLeafIndex,
+		extensions: []extension{
+			{
+				extensionType: extensionTypeRatchetTree,
+				extensionData: rawTree,
+			},
+		},
+	}
+	if err := newGroupInfo.sign(group.signaturePriv); err != nil {
+		return nil, nil, fmt.Errorf("failed to sign group info: %v", err)
+	}
+
+	keyPkgRef, err := keyPkg.GenerateRef()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate key package ref: %v", err)
+	}
+
+	encryptedGroupInfo, err := newGroupInfo.encrypt(joinerSecret, pskSecret)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to encrypt group info: %v", err)
+	}
+
+	groupSecrets := groupSecrets{joinerSecret: joinerSecret}
+	rawEncryptedGroupSecrets, err := groupSecrets.encrypt(cs, keyPkg.initKey, encryptedGroupInfo)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to encrypt group secrets: %v", err)
+	}
+
+	rawMsg, err := marshal(&mlsMessage{
+		version:       protocolVersionMLS10,
+		wireFormat:    wireFormatMLSPublicMessage,
+		publicMessage: pubMsg,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal public message: %v", err)
+	}
+
+	return &Welcome{
+		cipherSuite: cs,
+		secrets: []encryptedGroupSecrets{
+			{
+				newMember:             keyPkgRef,
+				encryptedGroupSecrets: *rawEncryptedGroupSecrets,
+			},
+		},
+		encryptedGroupInfo: encryptedGroupInfo,
+	}, rawMsg, nil
 }
 
 type commit struct {

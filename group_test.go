@@ -298,7 +298,20 @@ func TestGroup(t *testing.T) {
 		t.Fatalf("CreateGroup() = %v", err)
 	}
 
-	_ = aliceGroup
-	_ = bobKeyPairPkg
+	bobWelcome, msg, err := aliceGroup.CreateWelcome(&bobKeyPairPkg.Public)
+	if err != nil {
+		t.Fatalf("CreateWelcome() = %v", err)
+	}
+
+	if err := aliceGroup.UnmarshalAndProcessMessage(msg); err != nil {
+		t.Fatalf("UnmarshalAndProcessMessage() = %v", err)
+	}
+
+	bobGroup, err := GroupFromWelcome(bobWelcome, bobKeyPairPkg)
+	if err != nil {
+		t.Fatalf("GroupFromWelcome() = %v", err)
+	}
+
+	_ = bobGroup
 	// TODO
 }
