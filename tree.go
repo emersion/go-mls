@@ -642,6 +642,12 @@ func (tree ratchetTree) marshal(b *cryptobyte.Builder) {
 	})
 }
 
+func (tree ratchetTree) copy() ratchetTree {
+	newTree := make(ratchetTree, len(tree))
+	copy(newTree, tree)
+	return newTree
+}
+
 // get returns the node at the provided index.
 //
 // nil is returned for blank nodes. get panics if the index is out of range.

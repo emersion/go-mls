@@ -259,8 +259,7 @@ func (group *Group) processCommit(authContent *authenticatedContent, newPSKSecre
 	newGroupCtx := group.groupContext
 	newGroupCtx.epoch++
 
-	newTree := make(ratchetTree, len(group.tree))
-	copy(newTree, group.tree)
+	newTree := group.tree.copy()
 	newTree.apply(proposals, senders)
 
 	newPrivTree := make([][]byte, len(newTree))
