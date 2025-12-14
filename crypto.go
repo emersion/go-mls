@@ -27,6 +27,15 @@ type Credential struct {
 	certificates   [][]byte // for credentialTypeX509
 }
 
+// NewBasicCredential creates a new basic credential. identity uses an
+// application-specific format.
+func NewBasicCredential(identity []byte) *Credential {
+	return &Credential{
+		credentialType: credentialTypeBasic,
+		identity:       identity,
+	}
+}
+
 func (cred *Credential) unmarshal(s *cryptobyte.String) error {
 	*cred = Credential{}
 
