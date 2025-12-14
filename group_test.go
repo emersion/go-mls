@@ -283,13 +283,13 @@ func TestMessageProtection(t *testing.T) {
 func ExampleGroup() {
 	cs := CipherSuiteMLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
 
-	aliceCredential := NewBasicCredential([]byte("Alice"))
+	aliceCredential := NewBasicCredential([]byte("앨리스"))
 	aliceKeyPairPkg, err := GenerateKeyPairPackage(cs, aliceCredential)
 	if err != nil {
 		log.Fatalf("GenerateKeyPairPackage() = %v", err)
 	}
 
-	bobCredential := NewBasicCredential([]byte("Bob"))
+	bobCredential := NewBasicCredential([]byte("밥"))
 	bobKeyPairPkg, err := GenerateKeyPairPackage(cs, bobCredential)
 	if err != nil {
 		log.Fatalf("GenerateKeyPairPackage() = %v", err)
