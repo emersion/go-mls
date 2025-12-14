@@ -1040,6 +1040,20 @@ func UnmarshalWelcome(raw []byte) (*Welcome, error) {
 	return msg.welcome, nil
 }
 
+// Bytes encodes the welcome message.
+func (w *Welcome) Bytes() []byte {
+	raw, err := marshal(&mlsMessage{
+		version:    protocolVersionMLS10,
+		wireFormat: wireFormatMLSWelcome,
+		welcome:    w,
+	})
+	if err != nil {
+		// should never happen
+		panic(fmt.Errorf("mls: failed to marshal welcome message: %v", err))
+	}
+	return raw
+}
+
 func (w *Welcome) unmarshal(s *cryptobyte.String) error {
 	*w = Welcome{}
 
