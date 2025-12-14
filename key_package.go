@@ -178,7 +178,7 @@ type KeyPairPackage struct {
 }
 
 // GenerateKeyPairPackage generates a new key pair package.
-func GenerateKeyPairPackage(cs CipherSuite) (*KeyPairPackage, error) {
+func GenerateKeyPairPackage(cs CipherSuite, credential *Credential) (*KeyPairPackage, error) {
 	// TODO: add options to configure the new key package
 
 	initPub, initPriv, err := cs.generateEncryptionKeyPair()
@@ -204,10 +204,7 @@ func GenerateKeyPairPackage(cs CipherSuite) (*KeyPairPackage, error) {
 			encryptionKey:  encPub,
 			signatureKey:   sigPub,
 			leafNodeSource: leafNodeSourceKeyPackage,
-			credential: Credential{
-				credentialType: credentialTypeBasic,
-				identity:       []byte{},
-			},
+			credential:     *credential,
 			capabilities: capabilities{
 				versions:     []protocolVersion{protocolVersionMLS10},
 				cipherSuites: []CipherSuite{cs},
