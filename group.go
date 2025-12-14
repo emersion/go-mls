@@ -1,6 +1,7 @@
 package mls
 
 import (
+	"crypto/rand"
 	"fmt"
 	"io"
 	"time"
@@ -28,6 +29,70 @@ type Group struct {
 	privTree    [][]byte
 
 	pendingProposals []pendingProposal
+}
+
+// CreateGroup creates a new group with a single member.
+func CreateGroup(groupID GroupID, keyPairPkg *KeyPairPackage) (*Group, error) {
+	cs := keyPairPkg.Public.cipherSuite
+
+	tree := make(ratchetTree, 1)
+	tree.add(&keyPairPkg.Public.leafNode)
+
+	privTree := make([][]byte, len(tree))
+	privTree[0] = keyPairPkg.Private.EncryptionKey
+
+	treeHash, err := tree.computeRootTreeHash(cs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute root tree hash: %v", err)
+	}
+
+	confirmedTranscriptHash := make([]byte, cs.hash().Size())
+
+	_, kdf, _ := cs.hpke().Params()
+	epochSecret := make([]byte, kdf.ExtractSize())
+	if _, err := rand.Read(epochSecret); err != nil {
+		return nil, fmt.Errorf("failed to generate epoch secret: %v", err)
+	}
+
+	groupCtx := groupContext{
+		version:                 keyPairPkg.Public.version,
+		cipherSuite:             keyPairPkg.Public.cipherSuite,
+		groupID:                 groupID,
+		epoch:                   0,
+		treeHash:                treeHash,
+		confirmedTranscriptHash: confirmedTranscriptHash,
+	}
+
+	confirmationTag, err := groupCtx.signConfirmationTag(epochSecret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign confirmation tag: %v", err)
+	}
+
+	interimTranscriptHash, err := nextInterimTranscriptHash(cs, confirmedTranscriptHash, confirmationTag)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute initial interim transcript hash: %v", err)
+	}
+
+	pskSecret, err := extractPSKSecret(cs, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract PSK secret: %v", err)
+	}
+
+	initSecret, err := groupCtx.cipherSuite.deriveSecret(epochSecret, secretLabelInit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive init secret: %v", err)
+	}
+
+	return &Group{
+		tree:                  tree,
+		privTree:              privTree,
+		myLeafIndex:           0,
+		groupContext:          groupCtx,
+		interimTranscriptHash: interimTranscriptHash,
+		pskSecret:             pskSecret,
+		epochSecret:           epochSecret,
+		initSecret:            initSecret,
+	}, nil
 }
 
 // GroupFromWelcome creates a new group from a welcome message.
