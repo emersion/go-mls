@@ -316,7 +316,7 @@ func (authContent *authenticatedContent) framedContentTBS(ctx *groupContext) *fr
 	}
 }
 
-func (authContent *authenticatedContent) verifySignature(verifKey []byte, ctx *groupContext) bool {
+func (authContent *authenticatedContent) verifySignature(verifKey signaturePublicKey, ctx *groupContext) bool {
 	return authContent.auth.verifySignature(ctx.cipherSuite, verifKey, authContent.framedContentTBS(ctx))
 }
 
@@ -376,7 +376,7 @@ func (authData *framedContentAuthData) verifyConfirmationTag(cs CipherSuite, con
 	return cs.verifyMAC(confirmationKey, confirmedTranscriptHash, authData.confirmationTag)
 }
 
-func (authData *framedContentAuthData) verifySignature(cs CipherSuite, verifKey []byte, content *framedContentTBS) bool {
+func (authData *framedContentAuthData) verifySignature(cs CipherSuite, verifKey signaturePublicKey, content *framedContentTBS) bool {
 	rawContent, err := marshal(content)
 	if err != nil {
 		return false

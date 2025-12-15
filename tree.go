@@ -395,7 +395,7 @@ func (node *leafNode) verifySignature(cs CipherSuite, groupID GroupID, li leafIn
 	if err != nil {
 		return false
 	}
-	return cs.verifyWithLabel([]byte(node.signatureKey), []byte("LeafNodeTBS"), leafNodeTBS, node.signature)
+	return cs.verifyWithLabel(node.signatureKey, []byte("LeafNodeTBS"), leafNodeTBS, node.signature)
 }
 
 // verify performs leaf node validation described in section 7.3.

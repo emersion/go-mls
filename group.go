@@ -875,7 +875,7 @@ func (info *groupInfo) verifySignature(signerPub signaturePublicKey) bool {
 	if err != nil {
 		return false
 	}
-	return cs.verifyWithLabel([]byte(signerPub), []byte("GroupInfoTBS"), tbs, info.signature)
+	return cs.verifyWithLabel(signerPub, []byte("GroupInfoTBS"), tbs, info.signature)
 }
 
 func (info *groupInfo) sign(signerPriv []byte) error {
