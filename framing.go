@@ -266,7 +266,7 @@ type authenticatedContent struct {
 	auth       framedContentAuthData
 }
 
-func signAuthenticatedContent(cs CipherSuite, signKey []byte, wf wireFormat, content *framedContent, ctx *groupContext) (*authenticatedContent, error) {
+func signAuthenticatedContent(cs CipherSuite, signKey signaturePrivateKey, wf wireFormat, content *framedContent, ctx *groupContext) (*authenticatedContent, error) {
 	authContent := authenticatedContent{
 		wireFormat: wf,
 		content:    *content,
@@ -384,7 +384,7 @@ func (authData *framedContentAuthData) verifySignature(cs CipherSuite, verifKey 
 	return cs.verifyWithLabel(verifKey, []byte("FramedContentTBS"), rawContent, authData.signature)
 }
 
-func signFramedContent(cs CipherSuite, signKey []byte, content *framedContentTBS) ([]byte, error) {
+func signFramedContent(cs CipherSuite, signKey signaturePrivateKey, content *framedContentTBS) ([]byte, error) {
 	rawContent, err := marshal(content)
 	if err != nil {
 		return nil, err
@@ -415,7 +415,7 @@ type publicMessage struct {
 	membershipTag []byte // for senderTypeMember
 }
 
-func signPublicMessage(cs CipherSuite, signKey []byte, content *framedContent, ctx *groupContext) (*publicMessage, error) {
+func signPublicMessage(cs CipherSuite, signKey signaturePrivateKey, content *framedContent, ctx *groupContext) (*publicMessage, error) {
 	authContent, err := signAuthenticatedContent(cs, signKey, wireFormatMLSPublicMessage, content, ctx)
 	if err != nil {
 		return nil, err
@@ -511,7 +511,7 @@ type privateMessage struct {
 	ciphertext          []byte
 }
 
-func encryptPrivateMessage(cs CipherSuite, signPriv []byte, secret ratchetSecret, senderDataSecret []byte, content *framedContent, senderData *senderData, ctx *groupContext) (*privateMessage, error) {
+func encryptPrivateMessage(cs CipherSuite, signPriv signaturePrivateKey, secret ratchetSecret, senderDataSecret []byte, content *framedContent, senderData *senderData, ctx *groupContext) (*privateMessage, error) {
 	ciphertext, err := encryptPrivateMessageContent(cs, signPriv, secret, content, ctx, senderData.reuseGuard)
 	if err != nil {
 		return nil, err
@@ -750,7 +750,7 @@ func (content *privateMessageContent) marshal(b *cryptobyte.Builder, ct contentT
 	content.auth.marshal(b, ct)
 }
 
-func encryptPrivateMessageContent(cs CipherSuite, signKey []byte, secret ratchetSecret, content *framedContent, ctx *groupContext, reuseGuard [4]byte) ([]byte, error) {
+func encryptPrivateMessageContent(cs CipherSuite, signKey signaturePrivateKey, secret ratchetSecret, content *framedContent, ctx *groupContext, reuseGuard [4]byte) ([]byte, error) {
 	authContent, err := signAuthenticatedContent(cs, signKey, wireFormatMLSPrivateMessage, content, ctx)
 	if err != nil {
 		return nil, err

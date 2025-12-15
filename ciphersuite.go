@@ -169,7 +169,7 @@ func (cs CipherSuite) deriveSecret(secret, label []byte) ([]byte, error) {
 	return cs.expandWithLabel(secret, label, nil, uint16(kdf.ExtractSize()))
 }
 
-func (cs CipherSuite) signWithLabel(signKey, label, content []byte) ([]byte, error) {
+func (cs CipherSuite) signWithLabel(signKey signaturePrivateKey, label, content []byte) ([]byte, error) {
 	signContent, err := marshalSignContent(label, content)
 	if err != nil {
 		return nil, err
