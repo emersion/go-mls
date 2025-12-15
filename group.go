@@ -26,7 +26,7 @@ type Group struct {
 	initSecret            []byte
 
 	myLeafIndex   leafIndex
-	privTree      [][]byte
+	privTree      []hpkePrivateKey
 	signaturePriv []byte
 
 	pendingProposals []pendingProposal
@@ -39,7 +39,7 @@ func CreateGroup(groupID GroupID, keyPairPkg *KeyPairPackage) (*Group, error) {
 	tree := make(ratchetTree, 1)
 	tree.add(&keyPairPkg.Public.leafNode)
 
-	privTree := make([][]byte, len(tree))
+	privTree := make([]hpkePrivateKey, len(tree))
 	privTree[0] = keyPairPkg.Private.EncryptionKey
 
 	treeHash, err := tree.computeRootTreeHash(cs)
@@ -195,7 +195,7 @@ func groupFromSecrets(welcome *Welcome, keyPairPkg *KeyPairPackage, groupSecrets
 		return nil, fmt.Errorf("mls: failed to find my leaf node in ratchet tree")
 	}
 
-	privTree := make([][]byte, len(tree))
+	privTree := make([]hpkePrivateKey, len(tree))
 	privTree[int(myLeafIndex.nodeIndex())] = keyPairPkg.Private.EncryptionKey
 
 	if groupSecrets.pathSecret != nil {
@@ -219,7 +219,7 @@ func groupFromSecrets(welcome *Welcome, keyPairPkg *KeyPairPackage, groupSecrets
 	}, nil
 }
 
-func processPathSecret(cs CipherSuite, tree ratchetTree, privTree [][]byte, pathSecret []byte, nodeIndex nodeIndex) error {
+func processPathSecret(cs CipherSuite, tree ratchetTree, privTree []hpkePrivateKey, pathSecret []byte, nodeIndex nodeIndex) error {
 	nodePriv, err := nodePrivFromPathSecret(cs, pathSecret, tree.get(nodeIndex).encryptionKey())
 	if err != nil {
 		return fmt.Errorf("failed to derive node %v private key from path secret: %v", nodeIndex, err)
@@ -453,7 +453,7 @@ func (group *Group) processCommit(authContent *authenticatedContent, pskIDs []pr
 	newTree := group.tree.copy()
 	newTree.apply(proposals, senders)
 
-	newPrivTree := make([][]byte, len(newTree))
+	newPrivTree := make([]hpkePrivateKey, len(newTree))
 	for i := range group.tree {
 		if i < len(newPrivTree) {
 			newPrivTree[i] = group.privTree[i]
@@ -1107,7 +1107,7 @@ func (w *Welcome) findSecret(ref KeyPackageRef) *encryptedGroupSecrets {
 	return nil
 }
 
-func (w *Welcome) decryptGroupSecrets(ref KeyPackageRef, initKeyPriv []byte) (*groupSecrets, error) {
+func (w *Welcome) decryptGroupSecrets(ref KeyPackageRef, initKeyPriv hpkePrivateKey) (*groupSecrets, error) {
 	cs := w.cipherSuite
 
 	sec := w.findSecret(ref)

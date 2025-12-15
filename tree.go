@@ -486,7 +486,7 @@ func (node *updatePathNode) marshal(b *cryptobyte.Builder) {
 	})
 }
 
-func decryptPathSecret(cs CipherSuite, nodePriv []byte, ctx *groupContext, ciphertext hpkeCiphertext) ([]byte, error) {
+func decryptPathSecret(cs CipherSuite, nodePriv hpkePrivateKey, ctx *groupContext, ciphertext hpkeCiphertext) ([]byte, error) {
 	rawCtx, err := marshal(ctx)
 	if err != nil {
 		return nil, err
@@ -494,7 +494,7 @@ func decryptPathSecret(cs CipherSuite, nodePriv []byte, ctx *groupContext, ciphe
 	return cs.decryptWithLabel(nodePriv, []byte("UpdatePathNode"), rawCtx, ciphertext.kemOutput, ciphertext.ciphertext)
 }
 
-func nodePrivFromPathSecret(cs CipherSuite, pathSecret []byte, nodePub hpkePublicKey) ([]byte, error) {
+func nodePrivFromPathSecret(cs CipherSuite, pathSecret []byte, nodePub hpkePublicKey) (hpkePrivateKey, error) {
 	nodeSecret, err := cs.deriveSecret(pathSecret, []byte("node"))
 	if err != nil {
 		return nil, err
@@ -1205,7 +1205,7 @@ func (tree ratchetTree) mergeUpdatePath(cs CipherSuite, senderLeafIndex leafInde
 	return nil
 }
 
-func (tree ratchetTree) decryptPathSecrets(cs CipherSuite, groupCtx *groupContext, senderLeafIndex, recipientLeafIndex leafIndex, path *updatePath, privTree [][]byte) ([]byte, error) {
+func (tree ratchetTree) decryptPathSecrets(cs CipherSuite, groupCtx *groupContext, senderLeafIndex, recipientLeafIndex leafIndex, path *updatePath, privTree []hpkePrivateKey) ([]byte, error) {
 	senderNodeIndex := senderLeafIndex.nodeIndex()
 	recipientNodeIndex := recipientLeafIndex.nodeIndex()
 
@@ -1251,7 +1251,7 @@ func (tree ratchetTree) decryptPathSecrets(cs CipherSuite, groupCtx *groupContex
 
 	// Identify a node in the resolution of the copath node for which we have
 	// a private key
-	var nodePriv []byte
+	var nodePriv hpkePrivateKey
 	resolutionIndex := -1
 	for i, ni := range copathResolution {
 		if p := privTree[int(ni)]; p != nil {
