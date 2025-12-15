@@ -214,7 +214,7 @@ func (cs CipherSuite) encryptWithLabel(publicKey hpkePublicKey, label, context, 
 	return kemOutput, ciphertext, err
 }
 
-func (cs CipherSuite) decryptWithLabel(privateKey, label, context, kemOutput, ciphertext []byte) ([]byte, error) {
+func (cs CipherSuite) decryptWithLabel(privateKey hpkePrivateKey, label, context, kemOutput, ciphertext []byte) ([]byte, error) {
 	encryptContext, err := marshalEncryptContext(label, context)
 	if err != nil {
 		return nil, err
@@ -240,7 +240,7 @@ func (cs CipherSuite) decryptWithLabel(privateKey, label, context, kemOutput, ci
 	return opener.Open(ciphertext, nil)
 }
 
-func (cs CipherSuite) generateEncryptionKeyPair() (publicKey hpkePublicKey, privateKey []byte, err error) {
+func (cs CipherSuite) generateEncryptionKeyPair() (publicKey hpkePublicKey, privateKey hpkePrivateKey, err error) {
 	hpke := cs.hpke()
 	kem, _, _ := hpke.Params()
 	pub, priv, err := kem.Scheme().GenerateKeyPair()
