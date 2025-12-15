@@ -1004,7 +1004,7 @@ func (sec *groupSecrets) verifySingleReinitOrBranchPSK() bool {
 	return n <= 1
 }
 
-func (sec *groupSecrets) encrypt(cs CipherSuite, initKey, encryptedGroupInfo []byte) (*hpkeCiphertext, error) {
+func (sec *groupSecrets) encrypt(cs CipherSuite, initKey hpkePublicKey, encryptedGroupInfo []byte) (*hpkeCiphertext, error) {
 	rawGroupSecrets, err := marshal(sec)
 	if err != nil {
 		return nil, err
