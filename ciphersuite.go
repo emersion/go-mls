@@ -178,7 +178,7 @@ func (cs CipherSuite) signWithLabel(signKey, label, content []byte) ([]byte, err
 	return cs.signatureScheme().Sign(signKey, signContent)
 }
 
-func (cs CipherSuite) verifyWithLabel(verifKey, label, content, signValue []byte) bool {
+func (cs CipherSuite) verifyWithLabel(verifKey signaturePublicKey, label, content, signValue []byte) bool {
 	signContent, err := marshalSignContent(label, content)
 	if err != nil {
 		return false
