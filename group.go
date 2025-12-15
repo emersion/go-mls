@@ -27,7 +27,7 @@ type Group struct {
 
 	myLeafIndex   leafIndex
 	privTree      []hpkePrivateKey
-	signaturePriv []byte
+	signaturePriv signaturePrivateKey
 
 	pendingProposals []pendingProposal
 }
@@ -878,7 +878,7 @@ func (info *groupInfo) verifySignature(signerPub signaturePublicKey) bool {
 	return cs.verifyWithLabel(signerPub, []byte("GroupInfoTBS"), tbs, info.signature)
 }
 
-func (info *groupInfo) sign(signerPriv []byte) error {
+func (info *groupInfo) sign(signerPriv signaturePrivateKey) error {
 	cs := info.groupContext.cipherSuite
 	tbs, err := marshal((*groupInfoTBS)(info))
 	if err != nil {

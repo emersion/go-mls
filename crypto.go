@@ -8,9 +8,10 @@ import (
 )
 
 type (
-	hpkePublicKey      []byte
-	hpkePrivateKey     []byte
-	signaturePublicKey []byte
+	hpkePublicKey       []byte
+	hpkePrivateKey      []byte
+	signaturePublicKey  []byte
+	signaturePrivateKey []byte
 )
 
 type credentialType uint16

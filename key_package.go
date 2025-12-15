@@ -91,7 +91,7 @@ func (pkg *KeyPackage) marshal(b *cryptobyte.Builder) {
 	writeOpaqueVec(b, pkg.signature)
 }
 
-func (pkg *KeyPackage) sign(signerPriv []byte) error {
+func (pkg *KeyPackage) sign(signerPriv signaturePrivateKey) error {
 	var b cryptobyte.Builder
 	pkg.marshalTBS(&b)
 	rawTBS, err := b.Bytes()

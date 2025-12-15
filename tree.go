@@ -365,7 +365,7 @@ func (node *leafNodeTBS) marshal(b *cryptobyte.Builder) {
 	}
 }
 
-func (node *leafNode) sign(cs CipherSuite, groupID GroupID, li leafIndex, signerPriv []byte) error {
+func (node *leafNode) sign(cs CipherSuite, groupID GroupID, li leafIndex, signerPriv signaturePrivateKey) error {
 	leafNodeTBS, err := marshal(&leafNodeTBS{
 		leafNode:  node,
 		groupID:   groupID,
