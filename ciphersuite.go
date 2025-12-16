@@ -55,6 +55,22 @@ func (cs CipherSuite) String() string {
 	return fmt.Sprintf("<%d>", cs)
 }
 
+// Supported checks whether a cipher suite is supported by the library.
+func (cs CipherSuite) Supported() bool {
+	if _, ok := cipherSuiteDescriptions[cs]; !ok {
+		return false
+	}
+
+	// TODO: drop the seed size check, see:
+	// https://github.com/cloudflare/circl/issues/486
+	kem, kdf, _ := cs.hpke().Params()
+	if kem.Scheme().SeedSize() != kdf.ExtractSize() {
+		return false
+	}
+
+	return true
+}
+
 func (cs CipherSuite) hash() crypto.Hash {
 	desc, ok := cipherSuiteDescriptions[cs]
 	if !ok {

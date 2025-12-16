@@ -36,11 +36,8 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	encryptionPriv := []byte(tc.EncryptionPriv)
 	signaturePriv := []byte(tc.SignaturePriv)
 
-	// TODO: drop the seed size check, see:
-	// https://github.com/cloudflare/circl/issues/486
-	kem, kdf, _ := cs.hpke().Params()
-	if kem.Scheme().SeedSize() != kdf.ExtractSize() {
-		t.Skip("TODO: kem.Scheme().SeedSize() != kdf.ExtractSize()")
+	if !cs.Supported() {
+		t.Skipf("unsupported cipher suite %v", cs)
 	}
 
 	welcome, err := UnmarshalWelcome(tc.Welcome)
