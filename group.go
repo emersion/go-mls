@@ -841,7 +841,7 @@ type groupInfo struct {
 	extensions      []extension
 	confirmationTag []byte
 	signer          leafIndex
-	signature       []byte
+	signature       signature
 }
 
 func (info *groupInfo) unmarshal(s *cryptobyte.String) error {
@@ -857,9 +857,11 @@ func (info *groupInfo) unmarshal(s *cryptobyte.String) error {
 	}
 	info.extensions = exts
 
-	if !readOpaqueVec(s, &info.confirmationTag) || !s.ReadUint32((*uint32)(&info.signer)) || !readOpaqueVec(s, &info.signature) {
+	var signature []byte
+	if !readOpaqueVec(s, &info.confirmationTag) || !s.ReadUint32((*uint32)(&info.signer)) || !readOpaqueVec(s, &signature) {
 		return err
 	}
+	info.signature = signature
 
 	return nil
 }

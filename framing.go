@@ -341,16 +341,18 @@ func (authContent *authenticatedContent) generateProposalRef(cs CipherSuite) (pr
 }
 
 type framedContentAuthData struct {
-	signature       []byte
+	signature       signature
 	confirmationTag []byte // for contentTypeCommit
 }
 
 func (authData *framedContentAuthData) unmarshal(s *cryptobyte.String, ct contentType) error {
 	*authData = framedContentAuthData{}
 
-	if !readOpaqueVec(s, &authData.signature) {
+	var signature []byte
+	if !readOpaqueVec(s, &signature) {
 		return io.ErrUnexpectedEOF
 	}
+	authData.signature = signature
 
 	if ct == contentTypeCommit {
 		if !readOpaqueVec(s, &authData.confirmationTag) {
@@ -384,7 +386,7 @@ func (authData *framedContentAuthData) verifySignature(cs CipherSuite, verifKey 
 	return cs.verifyWithLabel(verifKey, []byte("FramedContentTBS"), rawContent, authData.signature)
 }
 
-func signFramedContent(cs CipherSuite, signKey signaturePrivateKey, content *framedContentTBS) ([]byte, error) {
+func signFramedContent(cs CipherSuite, signKey signaturePrivateKey, content *framedContentTBS) (signature, error) {
 	rawContent, err := marshal(content)
 	if err != nil {
 		return nil, err

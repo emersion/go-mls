@@ -281,7 +281,7 @@ type leafNode struct {
 	parentHash     []byte    // for leafNodeSourceCommit
 
 	extensions []extension
-	signature  []byte
+	signature  signature
 }
 
 func (node *leafNode) unmarshal(s *cryptobyte.String) error {
@@ -321,9 +321,11 @@ func (node *leafNode) unmarshal(s *cryptobyte.String) error {
 	}
 	node.extensions = exts
 
-	if !readOpaqueVec(s, &node.signature) {
+	var signature []byte
+	if !readOpaqueVec(s, &signature) {
 		return io.ErrUnexpectedEOF
 	}
+	node.signature = signature
 
 	return nil
 }

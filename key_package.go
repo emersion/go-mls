@@ -19,7 +19,7 @@ type KeyPackage struct {
 	initKey     hpkePublicKey
 	leafNode    leafNode
 	extensions  []extension
-	signature   []byte
+	signature   signature
 }
 
 // UnmarshalKeyPackage reads a key package encoded as an MLS message.
@@ -71,9 +71,11 @@ func (pkg *KeyPackage) unmarshal(s *cryptobyte.String) error {
 	}
 	pkg.extensions = exts
 
-	if !readOpaqueVec(s, &pkg.signature) {
+	var signature []byte
+	if !readOpaqueVec(s, &signature) {
 		return err
 	}
+	pkg.signature = signature
 
 	return nil
 }

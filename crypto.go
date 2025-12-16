@@ -10,6 +10,7 @@ import (
 type (
 	hpkePublicKey       []byte
 	hpkePrivateKey      []byte
+	signature           []byte
 	signaturePublicKey  []byte
 	signaturePrivateKey []byte
 )
