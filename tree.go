@@ -2,6 +2,7 @@ package mls
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"time"
@@ -1137,28 +1138,9 @@ func (tree ratchetTree) filteredDirectPath(x nodeIndex) []nodeIndex {
 	return path
 }
 
-func (tree ratchetTree) mergeUpdatePath(cs CipherSuite, senderLeafIndex leafIndex, path *updatePath) error {
-	senderNodeIndex := senderLeafIndex.nodeIndex()
-	numLeaves := tree.numLeaves()
-
-	directPath := numLeaves.directPath(senderNodeIndex)
-	for _, ni := range directPath {
-		tree.set(ni, nil)
-	}
-
+func (tree ratchetTree) computeParentHashes(cs CipherSuite, senderNodeIndex nodeIndex) ([]byte, error) {
+	directPath := tree.numLeaves().directPath(senderNodeIndex)
 	filteredDirectPath := tree.filteredDirectPath(senderNodeIndex)
-	if len(filteredDirectPath) != len(path.nodes) {
-		return fmt.Errorf("mls: UpdatePath has %v nodes, but filtered direct path has %v nodes", len(path.nodes), len(filteredDirectPath))
-	}
-	for i, ni := range filteredDirectPath {
-		pathNode := path.nodes[i]
-		tree.set(ni, &node{
-			nodeType: nodeTypeParent,
-			parentNode: &parentNode{
-				encryptionKey: pathNode.encryptionKey,
-			},
-		})
-	}
 
 	// Compute parent hashes, from root to leaf
 	var prevParentHash []byte
@@ -1185,18 +1167,47 @@ func (tree ratchetTree) mergeUpdatePath(cs CipherSuite, senderLeafIndex leafInde
 
 		treeHash, err := tree.computeTreeHash(cs, s, nil)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		node.parentHash = prevParentHash
 		h, err := node.computeParentHash(cs, treeHash)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		prevParentHash = h
 	}
 
-	if !bytes.Equal(path.leafNode.parentHash, prevParentHash) {
+	return prevParentHash, nil
+}
+
+func (tree ratchetTree) mergeUpdatePath(cs CipherSuite, senderLeafIndex leafIndex, path *updatePath) error {
+	senderNodeIndex := senderLeafIndex.nodeIndex()
+	numLeaves := tree.numLeaves()
+
+	directPath := numLeaves.directPath(senderNodeIndex)
+	for _, ni := range directPath {
+		tree.set(ni, nil)
+	}
+
+	filteredDirectPath := tree.filteredDirectPath(senderNodeIndex)
+	if len(filteredDirectPath) != len(path.nodes) {
+		return fmt.Errorf("mls: UpdatePath has %v nodes, but filtered direct path has %v nodes", len(path.nodes), len(filteredDirectPath))
+	}
+	for i, ni := range filteredDirectPath {
+		pathNode := path.nodes[i]
+		tree.set(ni, &node{
+			nodeType: nodeTypeParent,
+			parentNode: &parentNode{
+				encryptionKey: pathNode.encryptionKey,
+			},
+		})
+	}
+
+	leafParentHash, err := tree.computeParentHashes(cs, senderNodeIndex)
+	if err != nil {
+		return fmt.Errorf("failed to compute parent hashes: %v", err)
+	} else if !bytes.Equal(path.leafNode.parentHash, leafParentHash) {
 		return fmt.Errorf("mls: parent hash mismatch for update path's leaf node")
 	}
 
@@ -1300,6 +1311,71 @@ func (tree ratchetTree) decryptPathSecrets(cs CipherSuite, groupCtx *groupContex
 	}
 
 	return commitSecret, nil
+}
+
+// updateMyDirectPath updates a sender's direct path as specified in RFC 9420
+// section 7.5.
+func (tree ratchetTree) updateMyDirectPath(cs CipherSuite, senderLeafIndex leafIndex, signerPriv signaturePrivateKey, groupID GroupID, privTree []hpkePrivateKey) ([]byte, error) {
+	senderNodeIndex := senderLeafIndex.nodeIndex()
+	numLeaves := tree.numLeaves()
+
+	directPath := numLeaves.directPath(senderNodeIndex)
+	for _, ni := range directPath {
+		tree.set(ni, nil)
+	}
+
+	filteredDirectPath := tree.filteredDirectPath(senderNodeIndex)
+
+	_, kdf, _ := cs.hpke().Params()
+	pathSecret := make([]byte, kdf.ExtractSize())
+	if _, err := rand.Read(pathSecret); err != nil {
+		return nil, fmt.Errorf("failed to generate path secret for first parent node: %v", err)
+	}
+
+	for _, ni := range filteredDirectPath {
+		nodeSecret, err := cs.deriveSecret(pathSecret, []byte("node"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive node secret: %v", err)
+		}
+
+		pub, priv, err := cs.deriveEncryptionKeyPair(nodeSecret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive node encryption key pair: %v", err)
+		}
+
+		tree.get(ni).parentNode.encryptionKey = pub
+		privTree[int(ni)] = priv
+
+		pathSecret, err = cs.deriveSecret(pathSecret, []byte("path"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive path secret: %v", err)
+		}
+	}
+
+	leafParentHash, err := tree.computeParentHashes(cs, senderNodeIndex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute parent hashes: %v", err)
+	}
+
+	senderNode := tree.getLeaf(senderLeafIndex)
+
+	pub, priv, err := cs.generateEncryptionKeyPair()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate new node encryption key pair: %v", err)
+	}
+
+	senderNode.encryptionKey = pub
+	privTree[int(senderNodeIndex)] = priv
+
+	senderNode.leafNodeSource = leafNodeSourceCommit
+	senderNode.parentHash = leafParentHash
+	senderNode.lifetime = nil
+
+	if err := senderNode.sign(cs, groupID, senderLeafIndex, signerPriv); err != nil {
+		return nil, fmt.Errorf("failed to sign sender leaf node: %v", err)
+	}
+
+	return pathSecret, nil
 }
 
 func (tree *ratchetTree) apply(proposals []proposal, senders []leafIndex) {
