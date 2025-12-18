@@ -157,10 +157,8 @@ func testKeySchedule(t *testing.T, tc *keyScheduleTest) {
 		}
 
 		externalSecret := []byte(epoch.ExternalSecret)
-		kem, kdf, _ := ctx.cipherSuite.hpke().Params()
-		// TODO: drop the seed size check, see:
-		// https://github.com/cloudflare/circl/issues/486
-		if kem.Scheme().SeedSize() == kdf.ExtractSize() {
+		if ctx.cipherSuite.Supported() {
+			kem, _, _ := ctx.cipherSuite.hpke().Params()
 			pub, _ := kem.Scheme().DeriveKeyPair(externalSecret)
 			if b, err := pub.MarshalBinary(); err != nil {
 				t.Errorf("kem.PublicKey.MarshalBinary() = %v", err)

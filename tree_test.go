@@ -109,6 +109,12 @@ func testTreeKEM(t *testing.T, tc *treeKEMTest) {
 		signaturePriv  []byte
 	}
 
+	if !tc.CipherSuite.Supported() {
+		t.Skipf("unsupported cipher suite %v", tc.CipherSuite)
+	}
+
+	kem, _, _ := tc.CipherSuite.hpke().Params()
+
 	for _, leafPrivate := range tc.LeavesPrivate {
 		var tree ratchetTree
 		if err := unmarshal([]byte(tc.RatchetTree), &tree); err != nil {
@@ -119,13 +125,6 @@ func testTreeKEM(t *testing.T, tc *treeKEMTest) {
 		privTree[int(leafPrivate.Index.nodeIndex())] = privNode{
 			encryptionPriv: leafPrivate.EncryptionPriv,
 			signaturePriv:  leafPrivate.SignaturePriv,
-		}
-
-		// TODO: drop the seed size check, see:
-		// https://github.com/cloudflare/circl/issues/486
-		kem, kdf, _ := tc.CipherSuite.hpke().Params()
-		if kem.Scheme().SeedSize() != kdf.ExtractSize() {
-			continue
 		}
 
 		for _, ps := range leafPrivate.PathSecrets {
