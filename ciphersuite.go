@@ -273,7 +273,7 @@ func (cs CipherSuite) generateEncryptionKeyPair() (hpkePublicKey, hpkePrivateKey
 		return nil, nil, err
 	}
 
-	return hpkePublicKey(rawPub), rawPriv, nil
+	return rawPub, rawPriv, nil
 }
 
 func marshalSignContent(label, content []byte) ([]byte, error) {
