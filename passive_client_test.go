@@ -127,21 +127,9 @@ func testPassiveClient(t *testing.T, tc *passiveClientTest) {
 	for i, epoch := range tc.Epochs {
 		t.Logf("epoch %v", i)
 
-		for _, rawProposal := range epoch.Proposals {
-			var msg mlsMessage
-			if err := unmarshal([]byte(rawProposal), &msg); err != nil {
-				t.Fatalf("unmarshal(proposal) = %v", err)
-			} else if msg.wireFormat != wireFormatMLSPublicMessage {
-				t.Fatalf("TODO: wireFormat = %v", msg.wireFormat)
-			}
-			pubMsg := msg.publicMessage
-
-			// TODO: public message checks
-
-			authContent := pubMsg.authenticatedContent()
-
-			if err := group.processProposal(authContent); err != nil {
-				t.Errorf("processProposal() = %v", err)
+		for i, rawProposal := range epoch.Proposals {
+			if _, err := group.UnmarshalAndProcessMessage(rawProposal); err != nil {
+				t.Fatalf("UnmarshalAndProcessMessage(proposal[%v]) = %v", i, err)
 			}
 		}
 
