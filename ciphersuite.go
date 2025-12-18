@@ -256,7 +256,7 @@ func (cs CipherSuite) decryptWithLabel(privateKey hpkePrivateKey, label, context
 	return opener.Open(ciphertext, nil)
 }
 
-func (cs CipherSuite) generateEncryptionKeyPair() (publicKey hpkePublicKey, privateKey hpkePrivateKey, err error) {
+func (cs CipherSuite) generateEncryptionKeyPair() (hpkePublicKey, hpkePrivateKey, error) {
 	hpke := cs.hpke()
 	kem, _, _ := hpke.Params()
 	pub, priv, err := kem.Scheme().GenerateKeyPair()
