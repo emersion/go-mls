@@ -499,14 +499,17 @@ func nodePrivFromPathSecret(cs CipherSuite, pathSecret []byte, nodePub hpkePubli
 	if err != nil {
 		return nil, err
 	}
-	kem, _, _ := cs.hpke().Params()
-	pub, priv := kem.Scheme().DeriveKeyPair(nodeSecret)
-	if b, err := pub.MarshalBinary(); err != nil {
+
+	pub, priv, err := cs.deriveEncryptionKeyPair(nodeSecret)
+	if err != nil {
 		return nil, err
-	} else if !bytes.Equal(b, nodePub) {
+	}
+
+	if !bytes.Equal(pub, nodePub) {
 		return nil, fmt.Errorf("mls: node public key mismatch")
 	}
-	return priv.MarshalBinary()
+
+	return priv, nil
 }
 
 type updatePath struct {

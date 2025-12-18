@@ -276,6 +276,23 @@ func (cs CipherSuite) generateEncryptionKeyPair() (hpkePublicKey, hpkePrivateKey
 	return rawPub, rawPriv, nil
 }
 
+func (cs CipherSuite) deriveEncryptionKeyPair(seed []byte) (hpkePublicKey, hpkePrivateKey, error) {
+	kem, _, _ := cs.hpke().Params()
+	pub, priv := kem.Scheme().DeriveKeyPair(seed)
+
+	rawPub, err := pub.MarshalBinary()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	rawPriv, err := priv.MarshalBinary()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return rawPub, rawPriv, nil
+}
+
 func marshalSignContent(label, content []byte) ([]byte, error) {
 	label = append([]byte("MLS 1.0 "), label...)
 
