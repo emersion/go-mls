@@ -495,6 +495,15 @@ func decryptPathSecret(cs CipherSuite, nodePriv hpkePrivateKey, ctx *groupContex
 	return cs.decryptWithLabel(nodePriv, []byte("UpdatePathNode"), rawCtx, ciphertext.kemOutput, ciphertext.ciphertext)
 }
 
+func encryptPathSecret(cs CipherSuite, nodePub hpkePublicKey, ctx *groupContext, pathSecret []byte) (hpkeCiphertext, error) {
+	rawCtx, err := marshal(ctx)
+	if err != nil {
+		return hpkeCiphertext{}, err
+	}
+	kemOutput, ciphertext, err := cs.encryptWithLabel(nodePub, []byte("UpdatePathNode"), rawCtx, pathSecret)
+	return hpkeCiphertext{kemOutput: kemOutput, ciphertext: ciphertext}, err
+}
+
 func nodePrivFromPathSecret(cs CipherSuite, pathSecret []byte, nodePub hpkePublicKey) (hpkePrivateKey, error) {
 	nodeSecret, err := cs.deriveSecret(pathSecret, []byte("node"))
 	if err != nil {
@@ -1376,6 +1385,42 @@ func (tree ratchetTree) updateMyDirectPath(cs CipherSuite, senderLeafIndex leafI
 	}
 
 	return pathSecret, nil
+}
+
+func (tree ratchetTree) encryptPathSecrets(cs CipherSuite, groupCtx *groupContext, senderLeafIndex leafIndex) (*updatePath, error) {
+	senderNodeIndex := senderLeafIndex.nodeIndex()
+
+	filteredDirectPath := tree.filteredDirectPath(senderNodeIndex)
+	var nodes []updatePathNode
+	for _, ni := range filteredDirectPath {
+		copathNode := ni      // TODO
+		var pathSecret []byte // TODO
+
+		// TODO: exclude new members from the resolution
+		copathResolution := tree.resolve(copathNode)
+
+		var encryptedPathSecret []hpkeCiphertext
+		for _, ni := range copathResolution {
+			nodePub := tree.get(ni).encryptionKey()
+
+			ciphertext, err := encryptPathSecret(cs, nodePub, groupCtx, pathSecret)
+			if err != nil {
+				return nil, err
+			}
+
+			encryptedPathSecret = append(encryptedPathSecret, ciphertext)
+		}
+
+		nodes = append(nodes, updatePathNode{
+			encryptionKey:       nil, // TODO
+			encryptedPathSecret: encryptedPathSecret,
+		})
+	}
+
+	return &updatePath{
+		leafNode: *tree.getLeaf(senderLeafIndex),
+		nodes:    nodes,
+	}, nil
 }
 
 func (tree *ratchetTree) apply(proposals []proposal, senders []leafIndex) {
