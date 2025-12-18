@@ -495,6 +495,15 @@ func decryptPathSecret(cs CipherSuite, nodePriv hpkePrivateKey, ctx *groupContex
 	return cs.decryptWithLabel(nodePriv, []byte("UpdatePathNode"), rawCtx, ciphertext.kemOutput, ciphertext.ciphertext)
 }
 
+func encryptPathSecret(cs CipherSuite, nodePub hpkePublicKey, ctx *groupContext, pathSecret []byte) (hpkeCiphertext, error) {
+	rawCtx, err := marshal(ctx)
+	if err != nil {
+		return hpkeCiphertext{}, err
+	}
+	kemOutput, ciphertext, err := cs.encryptWithLabel(nodePub, []byte("UpdatePathNode"), rawCtx, pathSecret)
+	return hpkeCiphertext{kemOutput: kemOutput, ciphertext: ciphertext}, err
+}
+
 func nodePrivFromPathSecret(cs CipherSuite, pathSecret []byte, nodePub hpkePublicKey) (hpkePrivateKey, error) {
 	nodeSecret, err := cs.deriveSecret(pathSecret, []byte("node"))
 	if err != nil {
@@ -1376,6 +1385,60 @@ func (tree ratchetTree) updateMyDirectPath(cs CipherSuite, senderLeafIndex leafI
 	}
 
 	return pathSecret, nil
+}
+
+func (tree ratchetTree) encryptPathSecrets(cs CipherSuite, groupCtx *groupContext, pathSecrets [][]byte, senderLeafIndex leafIndex) (*updatePath, error) {
+	senderNodeIndex := senderLeafIndex.nodeIndex()
+	numLeaves := tree.numLeaves()
+
+	filteredDirectPath := tree.filteredDirectPath(senderNodeIndex)
+	var nodes []updatePathNode
+	for _, ni := range filteredDirectPath {
+		left, right, ok := ni.children()
+		if !ok {
+			panic("unreachable")
+		}
+
+		onDirectPath := senderNodeIndex
+		for onDirectPath != left && onDirectPath != right {
+			onDirectPath, ok = numLeaves.parent(onDirectPath)
+			if !ok {
+				panic("unreachable")
+			}
+		}
+
+		var copathNode nodeIndex
+		if onDirectPath == left {
+			copathNode = right
+		} else {
+			copathNode = left
+		}
+
+		// TODO: exclude new members from the resolution
+		copathResolution := tree.resolve(copathNode)
+
+		var encryptedPathSecret []hpkeCiphertext
+		for i, ni := range copathResolution {
+			nodePub := tree.get(ni).encryptionKey()
+
+			ciphertext, err := encryptPathSecret(cs, nodePub, groupCtx, pathSecrets[i])
+			if err != nil {
+				return nil, err
+			}
+
+			encryptedPathSecret = append(encryptedPathSecret, ciphertext)
+		}
+
+		nodes = append(nodes, updatePathNode{
+			encryptionKey:       nil, // TODO
+			encryptedPathSecret: encryptedPathSecret,
+		})
+	}
+
+	return &updatePath{
+		leafNode: *tree.getLeaf(senderLeafIndex),
+		nodes:    nodes,
+	}, nil
 }
 
 func (tree *ratchetTree) apply(proposals []proposal, senders []leafIndex) {
