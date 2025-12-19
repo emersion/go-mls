@@ -512,7 +512,12 @@ type privateMessage struct {
 }
 
 func encryptPrivateMessage(cs CipherSuite, signPriv signaturePrivateKey, secret ratchetSecret, senderDataSecret []byte, content *framedContent, senderData *senderData, ctx *groupContext) (*privateMessage, error) {
-	ciphertext, err := encryptPrivateMessageContent(cs, signPriv, secret, content, ctx, senderData.reuseGuard)
+	privContent, err := signPrivateMessageContent(cs, signPriv, content, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ciphertext, err := encryptPrivateMessageContent(cs, secret, content, privContent, senderData.reuseGuard)
 	if err != nil {
 		return nil, err
 	}
@@ -750,18 +755,21 @@ func (content *privateMessageContent) marshal(b *cryptobyte.Builder, ct contentT
 	content.auth.marshal(b, ct)
 }
 
-func encryptPrivateMessageContent(cs CipherSuite, signKey signaturePrivateKey, secret ratchetSecret, content *framedContent, ctx *groupContext, reuseGuard [4]byte) ([]byte, error) {
+func signPrivateMessageContent(cs CipherSuite, signKey signaturePrivateKey, content *framedContent, ctx *groupContext) (*privateMessageContent, error) {
 	authContent, err := signAuthenticatedContent(cs, signKey, wireFormatMLSPrivateMessage, content, ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	privContent := privateMessageContent{
+	return &privateMessageContent{
 		applicationData: content.applicationData,
 		proposal:        content.proposal,
 		commit:          content.commit,
 		auth:            authContent.auth,
-	}
+	}, nil
+}
+
+func encryptPrivateMessageContent(cs CipherSuite, secret ratchetSecret, content *framedContent, privContent *privateMessageContent, reuseGuard [4]byte) ([]byte, error) {
 	var b cryptobyte.Builder
 	privContent.marshal(&b, content.contentType)
 	plaintext, err := b.Bytes()
