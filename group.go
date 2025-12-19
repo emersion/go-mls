@@ -643,12 +643,29 @@ func (group *Group) CreateWelcome(keyPkg *KeyPackage) (*Welcome, []byte, error) 
 		commit:      &commit,
 	}
 
-	pubMsg, err := signPublicMessage(cs, group.signaturePriv, &framedContent, &group.groupContext)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to sign public message: %v", err)
+	public := false // TODO: add option to enable this
+	var (
+		authContent *authenticatedContent
+		authData    *framedContentAuthData
+		pubMsg      *publicMessage
+		privContent *privateMessageContent
+	)
+	if public {
+		pubMsg, err = signPublicMessage(cs, group.signaturePriv, &framedContent, &group.groupContext)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to sign public message: %v", err)
+		}
+		authContent = pubMsg.authenticatedContent()
+		authData = &pubMsg.auth
+	} else {
+		privContent, err = signPrivateMessageContent(cs, group.signaturePriv, &framedContent, &group.groupContext)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to sign private message: %v", err)
+		}
+		authContent = privContent.authenticatedContent(&framedContent)
+		authData = &privContent.auth
 	}
 
-	authContent := pubMsg.authenticatedContent()
 	newGroupCtx.confirmedTranscriptHash, err = authContent.confirmedTranscriptHashInput().hash(cs, group.interimTranscriptHash)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to hash confirmed transcript hash input: %v", err)
@@ -668,7 +685,7 @@ func (group *Group) CreateWelcome(keyPkg *KeyPackage) (*Welcome, []byte, error) 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to sign confirmation tag: %v", err)
 	}
-	pubMsg.auth.confirmationTag = confirmationTag
+	authData.confirmationTag = confirmationTag
 
 	rawTree, err := marshal(newTree)
 	if err != nil {
@@ -706,9 +723,17 @@ func (group *Group) CreateWelcome(keyPkg *KeyPackage) (*Welcome, []byte, error) 
 		return nil, nil, fmt.Errorf("failed to encrypt group secrets: %v", err)
 	}
 
-	rawMsg, err := group.signPublicMessageMembershipTag(pubMsg)
-	if err != nil {
-		return nil, nil, err
+	var rawMsg []byte
+	if public {
+		rawMsg, err = group.signPublicMessageMembershipTag(pubMsg)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		rawMsg, err = group.encryptPrivateMessage(&framedContent, privContent)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to encrypt private message: %v", err)
+		}
 	}
 
 	return &Welcome{
