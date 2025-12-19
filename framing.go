@@ -658,23 +658,19 @@ func derivePrivateMessageKeyAndNonce(cs CipherSuite, secret ratchetSecret, reuse
 }
 
 func (msg *privateMessage) authenticatedContent(senderData *senderData, content *privateMessageContent) *authenticatedContent {
-	return &authenticatedContent{
-		wireFormat: wireFormatMLSPrivateMessage,
-		content: framedContent{
-			groupID: msg.groupID,
-			epoch:   msg.epoch,
-			sender: sender{
-				senderType: senderTypeMember,
-				leafIndex:  senderData.leafIndex,
-			},
-			authenticatedData: msg.authenticatedData,
-			contentType:       msg.contentType,
-			applicationData:   content.applicationData,
-			proposal:          content.proposal,
-			commit:            content.commit,
+	return content.authenticatedContent(&framedContent{
+		groupID: msg.groupID,
+		epoch:   msg.epoch,
+		sender: sender{
+			senderType: senderTypeMember,
+			leafIndex:  senderData.leafIndex,
 		},
-		auth: content.auth,
-	}
+		authenticatedData: msg.authenticatedData,
+		contentType:       msg.contentType,
+		applicationData:   content.applicationData,
+		proposal:          content.proposal,
+		commit:            content.commit,
+	})
 }
 
 type senderDataAAD struct {
@@ -748,6 +744,14 @@ func (content *privateMessageContent) marshal(b *cryptobyte.Builder, ct contentT
 		panic("unreachable")
 	}
 	content.auth.marshal(b, ct)
+}
+
+func (content *privateMessageContent) authenticatedContent(framedContent *framedContent) *authenticatedContent {
+	return &authenticatedContent{
+		wireFormat: wireFormatMLSPrivateMessage,
+		content:    *framedContent,
+		auth:       content.auth,
+	}
 }
 
 func signPrivateMessageContent(cs CipherSuite, signKey signaturePrivateKey, content *framedContent, ctx *groupContext) (*privateMessageContent, error) {
