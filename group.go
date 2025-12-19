@@ -586,36 +586,41 @@ func resolveProposals(proposalOrRefs []proposalOrRef, senderLeafIndex leafIndex,
 	return proposals, senders, nil
 }
 
-// CreateWelcome creates a new welcome message, inviting a new member to the
+// CreateWelcome creates a new welcome message, inviting new members to the
 // group.
 //
-// The welcome message should be sent to the new member. Alongside the welcome
+// The welcome message should be sent to the new members. Alongside the welcome
 // message, a raw MLS message is returned and must be consumed by all existing
-// members of the group to add the new member.
-func (group *Group) CreateWelcome(keyPkg *KeyPackage) (*Welcome, []byte, error) {
+// members of the group to add the new members.
+func (group *Group) CreateWelcome(keyPkgs []KeyPackage) (*Welcome, []byte, error) {
 	// TODO: missing steps from section 12.4.1
 	cs := group.groupContext.cipherSuite
 
-	prop := proposal{
-		proposalType: proposalTypeAdd,
-		add:          &add{keyPackage: *keyPkg},
+	if len(keyPkgs) == 0 {
+		panic("mls: expected at least one key package")
+	}
+
+	proposals := make([]proposal, len(keyPkgs))
+	proposalOrRefs := make([]proposalOrRef, len(keyPkgs))
+	for i, keyPkg := range keyPkgs {
+		proposals[i] = proposal{
+			proposalType: proposalTypeAdd,
+			add:          &add{keyPackage: keyPkg},
+		}
+		proposalOrRefs[i] = proposalOrRef{
+			typ:      proposalOrRefTypeProposal,
+			proposal: &proposals[i],
+		}
 	}
 
 	// TODO: check proposal list validity per section 12.2
-	commit := commit{
-		proposals: []proposalOrRef{
-			{
-				typ:      proposalOrRefTypeProposal,
-				proposal: &prop,
-			},
-		},
-	}
+	commit := commit{proposals: proposalOrRefs}
 
 	newGroupCtx := group.groupContext
 	newGroupCtx.epoch++
 
 	newTree := group.tree.copy()
-	newTree.apply([]proposal{prop}, []leafIndex{group.myLeafIndex})
+	newTree.apply(proposals, []leafIndex{group.myLeafIndex})
 
 	// TODO: only recompute parts of the tree affected by proposals
 	var err error
@@ -707,20 +712,28 @@ func (group *Group) CreateWelcome(keyPkg *KeyPackage) (*Welcome, []byte, error) 
 		return nil, nil, fmt.Errorf("failed to sign group info: %v", err)
 	}
 
-	keyPkgRef, err := keyPkg.GenerateRef()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate key package ref: %v", err)
-	}
-
 	encryptedGroupInfo, err := newGroupInfo.encrypt(joinerSecret, pskSecret)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to encrypt group info: %v", err)
 	}
 
 	groupSecrets := groupSecrets{joinerSecret: joinerSecret}
-	rawEncryptedGroupSecrets, err := groupSecrets.encrypt(cs, keyPkg.initKey, encryptedGroupInfo)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to encrypt group secrets: %v", err)
+	encGroupSecrets := make([]encryptedGroupSecrets, len(keyPkgs))
+	for i, keyPkg := range keyPkgs {
+		keyPkgRef, err := keyPkg.GenerateRef()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to generate key package ref: %v", err)
+		}
+
+		rawEncryptedGroupSecrets, err := groupSecrets.encrypt(cs, keyPkg.initKey, encryptedGroupInfo)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to encrypt group secrets: %v", err)
+		}
+
+		encGroupSecrets[i] = encryptedGroupSecrets{
+			newMember:             keyPkgRef,
+			encryptedGroupSecrets: *rawEncryptedGroupSecrets,
+		}
 	}
 
 	var rawMsg []byte
@@ -737,13 +750,8 @@ func (group *Group) CreateWelcome(keyPkg *KeyPackage) (*Welcome, []byte, error) 
 	}
 
 	return &Welcome{
-		cipherSuite: cs,
-		secrets: []encryptedGroupSecrets{
-			{
-				newMember:             keyPkgRef,
-				encryptedGroupSecrets: *rawEncryptedGroupSecrets,
-			},
-		},
+		cipherSuite:        cs,
+		secrets:            encGroupSecrets,
 		encryptedGroupInfo: encryptedGroupInfo,
 	}, rawMsg, nil
 }

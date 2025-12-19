@@ -306,7 +306,7 @@ func ExampleGroup() {
 		log.Fatalf("CreateGroup() = %v", err)
 	}
 
-	bobWelcome, addMemberMsg, err := aliceGroup.CreateWelcome(&bobKeyPairPkg.Public)
+	bobWelcome, addMemberMsg, err := aliceGroup.CreateWelcome([]KeyPackage{bobKeyPairPkg.Public})
 	if err != nil {
 		log.Fatalf("CreateWelcome() = %v", err)
 	}
