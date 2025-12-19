@@ -670,14 +670,6 @@ func (group *Group) CreateWelcome(keyPkg *KeyPackage) (*Welcome, []byte, error) 
 	}
 	pubMsg.auth.confirmationTag = confirmationTag
 
-	membershipKey, err := group.groupContext.cipherSuite.deriveSecret(group.epochSecret, secretLabelMembership)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to derive membership key: %v", err)
-	}
-	if err := pubMsg.signMembershipTag(cs, membershipKey, &group.groupContext); err != nil {
-		return nil, nil, fmt.Errorf("failed to sign public message membership tag: %v", err)
-	}
-
 	rawTree, err := marshal(newTree)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to marshal ratchet tree: %v", err)
@@ -714,13 +706,9 @@ func (group *Group) CreateWelcome(keyPkg *KeyPackage) (*Welcome, []byte, error) 
 		return nil, nil, fmt.Errorf("failed to encrypt group secrets: %v", err)
 	}
 
-	rawMsg, err := marshal(&mlsMessage{
-		version:       protocolVersionMLS10,
-		wireFormat:    wireFormatMLSPublicMessage,
-		publicMessage: pubMsg,
-	})
+	rawMsg, err := group.signPublicMessageMembershipTag(pubMsg)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to marshal public message: %v", err)
+		return nil, nil, err
 	}
 
 	return &Welcome{
@@ -799,6 +787,29 @@ func (group *Group) encryptPrivateMessage(framedContent *framedContent, privCont
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal private message: %v", err)
+	}
+
+	return rawMsg, nil
+}
+
+func (group *Group) signPublicMessageMembershipTag(pubMsg *publicMessage) ([]byte, error) {
+	cs := group.groupContext.cipherSuite
+
+	membershipKey, err := group.groupContext.cipherSuite.deriveSecret(group.epochSecret, secretLabelMembership)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive membership key: %v", err)
+	}
+	if err := pubMsg.signMembershipTag(cs, membershipKey, &group.groupContext); err != nil {
+		return nil, fmt.Errorf("failed to sign public message membership tag: %v", err)
+	}
+
+	rawMsg, err := marshal(&mlsMessage{
+		version:       protocolVersionMLS10,
+		wireFormat:    wireFormatMLSPublicMessage,
+		publicMessage: pubMsg,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal public message: %v", err)
 	}
 
 	return rawMsg, nil
