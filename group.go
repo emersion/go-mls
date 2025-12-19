@@ -776,7 +776,12 @@ func (group *Group) CreateApplicationMessage(data []byte) ([]byte, error) {
 		contentType:     contentTypeApplication,
 		applicationData: data,
 	}
-	privMsg, err := encryptPrivateMessage(cs, group.signaturePriv, secret, senderDataSecret, &framedContent, senderData, &group.groupContext)
+	privContent, err := signPrivateMessageContent(cs, group.signaturePriv, &framedContent, &group.groupContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign private message: %v", err)
+	}
+
+	privMsg, err := encryptPrivateMessage(cs, secret, senderDataSecret, &framedContent, privContent, senderData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt private message: %v", err)
 	}

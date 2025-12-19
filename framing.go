@@ -511,12 +511,7 @@ type privateMessage struct {
 	ciphertext          []byte
 }
 
-func encryptPrivateMessage(cs CipherSuite, signPriv signaturePrivateKey, secret ratchetSecret, senderDataSecret []byte, content *framedContent, senderData *senderData, ctx *groupContext) (*privateMessage, error) {
-	privContent, err := signPrivateMessageContent(cs, signPriv, content, ctx)
-	if err != nil {
-		return nil, err
-	}
-
+func encryptPrivateMessage(cs CipherSuite, secret ratchetSecret, senderDataSecret []byte, content *framedContent, privContent *privateMessageContent, senderData *senderData) (*privateMessage, error) {
 	ciphertext, err := encryptPrivateMessageContent(cs, secret, content, privContent, senderData.reuseGuard)
 	if err != nil {
 		return nil, err
