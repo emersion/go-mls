@@ -184,7 +184,12 @@ func testMessageProtectionPriv(t *testing.T, tc *messageProtectionTest, ctx *gro
 		proposal:        content.proposal,
 		commit:          content.commit,
 	}
-	privMsg, err = encryptPrivateMessage(tc.CipherSuite, []byte(tc.SignaturePriv), secret, []byte(tc.SenderDataSecret), &framedContent, senderData, ctx)
+	privContent, err := signPrivateMessageContent(tc.CipherSuite, []byte(tc.SignaturePriv), &framedContent, ctx)
+	if err != nil {
+		t.Fatalf("signPrivateMessageContent() = %v", err)
+	}
+
+	privMsg, err = encryptPrivateMessage(tc.CipherSuite, secret, []byte(tc.SenderDataSecret), &framedContent, privContent, senderData)
 	if err != nil {
 		t.Fatalf("encryptPrivateMessage() = %v", err)
 	}
