@@ -740,32 +740,6 @@ func (group *Group) CreateWelcome(keyPkg *KeyPackage) (*Welcome, []byte, error) 
 func (group *Group) CreateApplicationMessage(data []byte) ([]byte, error) {
 	cs := group.groupContext.cipherSuite
 
-	senderData, err := newSenderData(group.myLeafIndex, 0) // TODO: set generation > 0
-	if err != nil {
-		return nil, fmt.Errorf("failed to create sender data: %v", err)
-	}
-
-	encryptionSecret, err := cs.deriveSecret(group.epochSecret, secretLabelEncryption)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive encryption secret: %v", err)
-	}
-
-	secretTree, err := deriveSecretTree(cs, group.tree.numLeaves(), encryptionSecret)
-	if err != nil {
-		return nil, fmt.Errorf("failed to erive secret tree: %v", err)
-	}
-
-	label := ratchetLabelFromContentType(contentTypeApplication)
-	secret, err := secretTree.deriveRatchetRoot(cs, group.myLeafIndex.nodeIndex(), label)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive secret ratchet tree root: %v", err)
-	}
-
-	senderDataSecret, err := cs.deriveSecret(group.epochSecret, secretLabelSenderData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive sender data secret: %v", err)
-	}
-
 	framedContent := framedContent{
 		groupID: group.groupContext.groupID,
 		epoch:   group.groupContext.epoch,
@@ -781,7 +755,39 @@ func (group *Group) CreateApplicationMessage(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to sign private message: %v", err)
 	}
 
-	privMsg, err := encryptPrivateMessage(cs, secret, senderDataSecret, &framedContent, privContent, senderData)
+	return group.encryptPrivateMessage(&framedContent, privContent)
+}
+
+func (group *Group) encryptPrivateMessage(framedContent *framedContent, privContent *privateMessageContent) ([]byte, error) {
+	cs := group.groupContext.cipherSuite
+
+	senderData, err := newSenderData(group.myLeafIndex, 0) // TODO: set generation > 0
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sender data: %v", err)
+	}
+
+	encryptionSecret, err := cs.deriveSecret(group.epochSecret, secretLabelEncryption)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive encryption secret: %v", err)
+	}
+
+	secretTree, err := deriveSecretTree(cs, group.tree.numLeaves(), encryptionSecret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to erive secret tree: %v", err)
+	}
+
+	label := ratchetLabelFromContentType(framedContent.contentType)
+	secret, err := secretTree.deriveRatchetRoot(cs, group.myLeafIndex.nodeIndex(), label)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive secret ratchet tree root: %v", err)
+	}
+
+	senderDataSecret, err := cs.deriveSecret(group.epochSecret, secretLabelSenderData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive sender data secret: %v", err)
+	}
+
+	privMsg, err := encryptPrivateMessage(cs, secret, senderDataSecret, framedContent, privContent, senderData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt private message: %v", err)
 	}
