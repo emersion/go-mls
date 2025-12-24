@@ -67,7 +67,7 @@ func readOpaqueVec(s *cryptobyte.String, out *[]byte) bool {
 }
 
 func writeOpaqueVec(b *cryptobyte.Builder, value []byte) {
-	if len(value) >= 1<<32 {
+	if uint64(len(value)) >= 1<<32 {
 		b.SetError(fmt.Errorf("mls: opaque size exceeds maximum value of uint32"))
 		return
 	}
