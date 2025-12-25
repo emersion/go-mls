@@ -454,11 +454,7 @@ func (group *Group) processCommit(authContent *authenticatedContent, pskIDs []pr
 	newTree.apply(proposals, senders)
 
 	newPrivTree := make([]hpkePrivateKey, len(newTree))
-	for i := range group.tree {
-		if i < len(newPrivTree) {
-			newPrivTree[i] = group.privTree[i]
-		}
-	}
+	copy(newPrivTree, group.privTree)
 
 	_, kdf, _ := cs.hpke().Params()
 	commitSecret := make([]byte, kdf.ExtractSize())
