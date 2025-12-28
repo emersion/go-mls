@@ -454,11 +454,7 @@ func (group *Group) processCommit(authContent *authenticatedContent, pskIDs []pr
 	newTree.apply(proposals, senders)
 
 	newPrivTree := make([]hpkePrivateKey, len(newTree))
-	for i := range group.tree {
-		if i < len(newPrivTree) {
-			newPrivTree[i] = group.privTree[i]
-		}
-	}
+	copy(newPrivTree, group.privTree)
 
 	_, kdf, _ := cs.hpke().Params()
 	commitSecret := make([]byte, kdf.ExtractSize())
@@ -622,6 +618,9 @@ func (group *Group) CreateWelcome(keyPkgs []KeyPackage) (*Welcome, []byte, error
 	newTree := group.tree.copy()
 	newTree.apply(proposals, []leafIndex{group.myLeafIndex})
 
+	newPrivTree := make([]hpkePrivateKey, len(newTree))
+	copy(newPrivTree, group.privTree)
+
 	// TODO: only recompute parts of the tree affected by proposals
 	var err error
 	newGroupCtx.treeHash, err = newTree.computeRootTreeHash(cs)
@@ -629,8 +628,25 @@ func (group *Group) CreateWelcome(keyPkgs []KeyPackage) (*Welcome, []byte, error
 		return nil, nil, fmt.Errorf("failed to compute root tree hash: %v", err)
 	}
 
-	_, kdf, _ := cs.hpke().Params()
-	commitSecret := make([]byte, kdf.ExtractSize())
+	var commitSecret []byte
+	populatePathField := true // TODO
+	if populatePathField {
+		pathSecrets, err := newTree.updateMyDirectPath(cs, group.myLeafIndex, group.signaturePriv, group.groupContext.groupID, newPrivTree)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to update my direct path: %v", err)
+		}
+
+		updatePath, err := newTree.encryptPathSecrets(cs, &newGroupCtx, pathSecrets, group.myLeafIndex)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to encrypt path secrets: %v", err)
+		}
+
+		commit.path = updatePath
+		commitSecret = pathSecrets[len(pathSecrets)-1]
+	} else {
+		_, kdf, _ := cs.hpke().Params()
+		commitSecret = make([]byte, kdf.ExtractSize())
+	}
 
 	pskSecret, err := extractPSKSecret(cs, nil, nil)
 	if err != nil {
