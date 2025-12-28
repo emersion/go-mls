@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/cryptobyte"
+
+	"log"
 )
 
 type parentNode struct {
@@ -1324,7 +1326,7 @@ func (tree ratchetTree) decryptPathSecrets(cs CipherSuite, groupCtx *groupContex
 
 // updateMyDirectPath updates a sender's direct path as specified in RFC 9420
 // section 7.5.
-func (tree ratchetTree) updateMyDirectPath(cs CipherSuite, senderLeafIndex leafIndex, signerPriv signaturePrivateKey, groupID GroupID, privTree []hpkePrivateKey) ([]byte, error) {
+func (tree ratchetTree) updateMyDirectPath(cs CipherSuite, senderLeafIndex leafIndex, signerPriv signaturePrivateKey, groupID GroupID, privTree []hpkePrivateKey) ([][]byte, error) {
 	senderNodeIndex := senderLeafIndex.nodeIndex()
 	numLeaves := tree.numLeaves()
 
@@ -1341,6 +1343,7 @@ func (tree ratchetTree) updateMyDirectPath(cs CipherSuite, senderLeafIndex leafI
 		return nil, fmt.Errorf("failed to generate path secret for first parent node: %v", err)
 	}
 
+	pathSecrets := [][]byte{pathSecret}
 	for _, ni := range filteredDirectPath {
 		nodeSecret, err := cs.deriveSecret(pathSecret, []byte("node"))
 		if err != nil {
@@ -1352,13 +1355,20 @@ func (tree ratchetTree) updateMyDirectPath(cs CipherSuite, senderLeafIndex leafI
 			return nil, fmt.Errorf("failed to derive node encryption key pair: %v", err)
 		}
 
-		tree.get(ni).parentNode.encryptionKey = pub
+		log.Printf("pub=%v", pub)
+
+		tree.set(ni, &node{
+			nodeType:   nodeTypeParent,
+			parentNode: &parentNode{encryptionKey: pub},
+		})
 		privTree[int(ni)] = priv
 
 		pathSecret, err = cs.deriveSecret(pathSecret, []byte("path"))
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive path secret: %v", err)
 		}
+
+		pathSecrets = append(pathSecrets, pathSecret)
 	}
 
 	leafParentHash, err := tree.computeParentHashes(cs, senderNodeIndex)
@@ -1384,7 +1394,7 @@ func (tree ratchetTree) updateMyDirectPath(cs CipherSuite, senderLeafIndex leafI
 		return nil, fmt.Errorf("failed to sign sender leaf node: %v", err)
 	}
 
-	return pathSecret, nil
+	return pathSecrets, nil
 }
 
 func (tree ratchetTree) encryptPathSecrets(cs CipherSuite, groupCtx *groupContext, pathSecrets [][]byte, senderLeafIndex leafIndex) (*updatePath, error) {
